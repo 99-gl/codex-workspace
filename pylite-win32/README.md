@@ -39,7 +39,7 @@ cd pylite-win32
 ./scripts/build-win-x64.sh
 ```
 
-脚本运行 Linux 核心测试、界面结构检查、资源编译、静态链接和单文件验证。成品位于 `artifacts/win-x64/PyLite.exe`。
+脚本运行 Linux 核心测试、界面结构检查、DPI manifest 静态校验、资源编译、静态链接和单文件验证。成品位于 `artifacts/win-x64/PyLite.exe`。静态校验会拒绝把 `PerMonitorV2` 写入旧版 `dpiAware` 节点，避免程序在进入 `wWinMain` 前因激活上下文初始化而退出。
 
 单独测试：
 

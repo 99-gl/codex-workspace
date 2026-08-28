@@ -13,6 +13,7 @@ if [[ ! -x "$compiler" || ! -x "$windres" ]]; then
   exit 2
 fi
 command -v g++ >/dev/null || { echo "Host g++ is required for core tests." >&2; exit 2; }
+command -v python3 >/dev/null || { echo "Python 3 is required for manifest validation." >&2; exit 2; }
 
 build="$root/build"
 output="$root/artifacts/win-x64"
@@ -22,6 +23,7 @@ rm -f "$build/core_tests" "$build/app-res.o" "$output/PyLite.exe"
 g++ -std=c++17 -O2 -Wall -Wextra "$root/tests/core_tests.cpp" -o "$build/core_tests"
 "$build/core_tests"
 bash "$root/tests/structure_tests.sh"
+python3 "$root/tests/validate_manifest.py" "$root/resources/app.manifest"
 
 (cd "$root/resources" && "$windres" -I . -I "$toolroot/usr/x86_64-w64-mingw32/include" app.rc "$build/app-res.o")
 export PATH="$toolroot/usr/bin:$PATH"
