@@ -11,4 +11,8 @@ done
 test -f "$root/UI_REDESIGN_SPEC_FOR_CODEX.txt"
 rg -q 'PYTHONIOENCODING' "$source_file"
 rg -q -- '--register-open-with' "$source_file"
+rg -q 'dyLineSpacing=28' "$source_file"
+! rg -q 'dyLineSpacing=330' "$source_file"
+rg -q 'gLastEditTick' "$source_file"
+rg -q 'visibleBudget' "$source_file"
 echo "All structure tests passed"
