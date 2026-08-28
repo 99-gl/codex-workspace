@@ -57,7 +57,7 @@ void OpenFile(const std::wstring&p){if(!ConfirmDiscard())return;auto ext=fs::pat
 int S(int value){return pylite_ui::Scale(value,gDpi);}
 
 void ApplyParagraphSpacing(HWND edit){
-  if(!edit)return;CHARRANGE saved{};SendMessage(edit,EM_EXGETSEL,0,(LPARAM)&saved);BOOL modified=(BOOL)SendMessage(edit,EM_GETMODIFY,0,0);SendMessage(edit,EM_SETSEL,0,-1);PARAFORMAT2 format{sizeof(format)};format.dwMask=PFM_LINESPACING;format.bLineSpacingRule=5;format.dyLineSpacing=330;SendMessage(edit,EM_SETPARAFORMAT,0,(LPARAM)&format);SendMessage(edit,EM_EXSETSEL,0,(LPARAM)&saved);SendMessage(edit,EM_SETMODIFY,modified,0);
+  if(!edit)return;bool wasFormatting=gFormatting;gFormatting=true;CHARRANGE saved{};SendMessage(edit,EM_EXGETSEL,0,(LPARAM)&saved);BOOL modified=(BOOL)SendMessage(edit,EM_GETMODIFY,0,0);SendMessage(edit,EM_SETSEL,0,-1);PARAFORMAT2 format{sizeof(format)};format.dwMask=PFM_LINESPACING;format.bLineSpacingRule=5;format.dyLineSpacing=330;SendMessage(edit,EM_SETPARAFORMAT,0,(LPARAM)&format);SendMessage(edit,EM_EXSETSEL,0,(LPARAM)&saved);SendMessage(edit,EM_SETMODIFY,modified,0);gFormatting=wasFormatting;
 }
 
 void DeleteUiResources(){
@@ -159,7 +159,7 @@ void DrawOwnerButton(const DRAWITEMSTRUCT&d){
   if(id==ID_RUN){fill=(hot||pressed)?gPrimaryHoverBrush:gPrimaryBrush;text=pylite_ui::Theme::PrimaryButtonText;}
   else if(id==ID_PY){fill=(hot||pressed)?gHoverBrush:gAppBrush;}
   else if(hot||pressed)fill=gHoverBrush;
-  PaintRounded(d.hDC,r,fill,radius);
+  PaintWithBrush(d.hDC,r,gPanelBrush);PaintRounded(d.hDC,r,fill,radius);
   if(id==ID_PY)StrokeRounded(d.hDC,r,gBorderPen,radius);
   if((d.itemState&ODS_FOCUS)&&id!=ID_RUN){RECT f=r;InflateRect(&f,-S(2),-S(2));StrokeRounded(d.hDC,f,gBorderPen,radius);}
   if(id==ID_PY){
@@ -321,7 +321,7 @@ LRESULT CALLBACK Proc(HWND h,UINT m,WPARAM w,LPARAM l){
   }
   case WM_APPEND:{auto*s=(std::wstring*)l;AppendOutput(*s);delete s;return 0;}
   case WM_RUNEND:{gRunning=false;SetWindowTextW(gRun,L"▶ 运行");gLastExit=(int)(DWORD)l;AppendOutput(L"\r\n● 已完成 · 退出码 "+std::to_wstring((DWORD)l)+L"\r\n");SetStatus(gLastExit==0?L"运行成功":L"运行失败");InvalidateRect(gRun,nullptr,FALSE);InvalidateRect(h,nullptr,FALSE);return 0;}
-  case WM_INTERPRETER:{auto*p=(std::pair<std::wstring,std::wstring>*)l;if(!p->second.empty()){gInterpreter=p->first;SetWindowTextW(gPy,(L"Python "+p->second).c_str());SetStatus(L"Python 解释器有效");{std::lock_guard lk(gCacheMutex);gModuleCache.clear();}SaveSettings();}else{SetWindowTextW(gPy,L"选择 Python");SetStatus(L"Python 解释器不可用");}InvalidateRect(gPy,nullptr,FALSE);delete p;return 0;}
+  case WM_INTERPRETER:{auto*p=(std::pair<std::wstring,std::wstring>*)l;if(!p->second.empty()){gInterpreter=p->first;SetWindowTextW(gPy,p->second.c_str());SetStatus(L"Python 解释器有效");{std::lock_guard lk(gCacheMutex);gModuleCache.clear();}SaveSettings();}else{SetWindowTextW(gPy,L"选择 Python");SetStatus(L"Python 解释器不可用");}InvalidateRect(gPy,nullptr,FALSE);delete p;return 0;}
   case WM_COMPLETIONS:{auto*v=(std::vector<std::wstring>*)l;if((unsigned)w==gCompletionRequest){ShowCompletion(*v);SetStatus(v->empty()?L"模块补全不可用":L"模块补全已加载");}delete v;return 0;}
   case WM_CLOSE:if(!ConfirmDiscard())return 0;SaveSettings();if(gJob)TerminateJobObject(gJob,1);DestroyWindow(h);return 0;
   case WM_DESTROY:KillTimer(h,1);if(gMenuBar){DestroyMenu(gMenuBar);gMenuBar=nullptr;}DeleteUiResources();PostQuitMessage(0);return 0;
