@@ -14,6 +14,8 @@ PyLite 是一个面向 Windows 10/11 x64 的轻量 Python 记事本。它是原�
 - 可拖动左右栏和输出高度，输出区可折叠，布局写入 `%APPDATA%\PyLite\settings.json`
 - 当前用户范围注册 `.py`/`.pyw` 的“打开方式”，不改变默认程序
 - 支持 `PyLite.exe 文件.py`、`--register-open-with` 和 `--unregister-open-with`
+- 原生 Win32 现代浅色界面：自绘命令栏、轻量按钮、Explorer 文件树、编辑器行号、现代输出区和状态栏
+- Per-monitor DPI 布局与字体缩放，保留 Windows 原生标题栏以维持窗口拖动流畅度
 
 ## 使用
 
@@ -22,6 +24,8 @@ PyLite 是一个面向 Windows 10/11 x64 的轻量 Python 记事本。它是原�
 补全列表在输入标识符时显示；方向键选择，Tab/Enter 接受，Esc 关闭。输入模块点号会启动所选 Python 的独立隐藏子进程。导入模块可能执行模块初始化代码，只应对可信 Python 环境使用动态补全。
 
 栏间的浅灰分隔条可拖动；输出标题上方的横向分隔条可调整输出高度。工具菜单可注册或移除“打开方式”。
+
+界面继续使用原生 Win32/GDI 和 RichEdit，不依赖 Qt、WebView2、WPF 或其他 UI 运行时。窗口标题栏、阴影和窗口控制按钮由 Windows 管理；客户区的颜色、按钮、面板标题、行号和状态信息由 PyLite 轻量绘制。
 
 ## 构建
 

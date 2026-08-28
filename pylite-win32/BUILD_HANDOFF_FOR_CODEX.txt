@@ -1,0 +1,80 @@
+PyLite Win32 界面改版：Linux 构建交接
+====================================
+
+你的职责是构建和报告，不要自行重新设计或大范围修改源码。
+
+目标分支：implement/win32-ui-refresh
+
+请执行：
+
+1. 拉取并切换到 implement/win32-ui-refresh。
+2. 确认工作区没有混入其他分支的未提交文件。
+3. 使用项目原有 GCC 13 MinGW-w64 POSIX 工具链运行：
+
+     cd pylite-win32
+     ./scripts/build-win-x64.sh
+
+4. 如果编译失败：
+   - 保存完整编译输出；
+   - 提交一份 BUILD_RESULT.txt，写清第一个真实编译错误及后续错误；
+   - 不要凭猜测大改 UI 源码；
+   - 将日志提交并推送到当前分支，交回 Windows 端修复。
+
+5. 如果编译成功：
+   - 确认核心测试、结构测试和 manifest 校验全部通过；
+   - 确认结果是 PE32+、Windows GUI、x86-64；
+   - 输出 EXE 文件大小和 SHA-256；
+   - 将新候选保存在 pylite-win32/PyLite.exe；
+   - 更新 BUILD_RESULT.txt，列出工具链版本、测试结果、大小和 SHA-256；
+   - 提交 PyLite.exe 与 BUILD_RESULT.txt 并推送当前分支。
+
+6. 不要创建或覆盖正式 Release。该 EXE 仍需 Windows 10 真机验证。
+
+
+本次源码改动概览
+----------------
+
+- 保留 Windows 原生标题栏和 WS_OVERLAPPEDWINDOW；
+- 移除附着在窗口上的传统菜单栏，使用客户区命令栏和 TrackPopupMenuEx；
+- 保存、解释器、运行、打开文件夹、清空、折叠改为 BS_OWNERDRAW；
+- 加入集中式浅色主题和 DPI 缩放资源；
+- TreeView 使用 Explorer 主题、28 px 行高、系统文件图标和现代选中颜色；
+- RichEdit 去掉 WS_EX_CLIENTEDGE，增加编辑边距、正常字重和行距；
+- 加入只绘制可见行的 PyLiteGutter 行号栏；
+- 输出区和状态栏改为轻量自绘；
+- 布局使用 DeferWindowPos；
+- 没有使用 WS_EX_COMPOSITED；
+- 语法高亮从“脏文件每 350 ms 全量重复执行”改为每次变更仅调度一次；
+- 构建新增系统 uxtheme 链接。
+
+
+需要特别核对的编译点
+--------------------
+
+- src/ui_theme.hpp 中 EnumFontFamiliesExW 的回调类型；
+- uxtheme.h 与 -luxtheme；
+- RichEdit PARAFORMAT2 / PFM_LINESPACING；
+- NMTVCUSTOMDRAW、TVN_DELETEITEMW 和系统 HIMAGELIST；
+- WM_DPICHANGED 在 _WIN32_WINNT=0x0601 编译目标下的头文件可用性；
+- std::initializer_list 中的 GDI 句柄类型推导。
+
+Windows 端已使用旧 GCC 8.1 做过尽力的语法检查。新增 UI 层没有暴露语法错误；
+本机检查仍会因旧 libstdc++ 不支持本项目既有的 std::filesystem/wstring 和
+std::regex::multiline 而失败，因此必须以服务器上的 GCC 13 构建结果为准。
+
+
+Windows 真机后续验证项
+----------------------
+
+- 启动后至少保持运行 10 秒；
+- 快速拖动窗口是否保持流畅；
+- 最大化、还原和连续调整窗口尺寸；
+- 拖动左栏、右栏和输出区分隔条；
+- 100%、125%、150% DPI；
+- 文件菜单、编辑菜单、运行菜单、工具菜单；
+- 保存、选择解释器、运行和停止按钮；
+- 文件树展开、打开文件和系统图标；
+- 行号随编辑、滚动和光标移动同步；
+- 高亮、Tab 补全和模块动态补全；
+- stdout/stderr、退出码、折叠和清空；
+- .py 打开方式和命令行打开文件。

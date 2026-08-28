@@ -34,7 +34,7 @@ export PATH="$toolroot/usr/bin:$PATH"
   --sysroot="$toolroot" \
   "$root/src/main.cpp" "$build/app-res.o" \
   -municode -mwindows -static -static-libgcc -static-libstdc++ \
-  -lcomctl32 -lcomdlg32 -lshell32 -lshlwapi -lole32 -luuid -ladvapi32 -lgdi32 -luser32 \
+  -lcomctl32 -lcomdlg32 -lshell32 -lshlwapi -lole32 -luuid -ladvapi32 -lgdi32 -luser32 -luxtheme \
   -o "$output/PyLite.exe"
 
 file_count="$(find "$output" -maxdepth 1 -type f | wc -l)"
