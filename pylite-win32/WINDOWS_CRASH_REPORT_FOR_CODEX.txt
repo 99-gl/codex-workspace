@@ -1,0 +1,182 @@
+PyLite Windows 启动崩溃：诊断结果与后续构建任务
+================================================
+
+目的
+----
+这份文件是给 Linux 服务器上的 Codex 的完整交接信息。当前 GitHub Release 中的
+PyLite.exe 虽然能生成有效的 PE32+ 文件，但在真实 Windows 10 x64 上无法打开。
+请基于本仓库源码修复并重新交叉构建，不要把“Linux 下测试通过、file 能识别 PE”
+当作 Windows GUI 已验证。
+
+
+一、被测成品
+------------
+
+来源：GitHub Release v1.0.0 中的 PyLite.exe
+本机路径：C:\Users\10053\Downloads\PyLite.exe
+文件大小：3,932,771 bytes
+SHA-256：1031528C0B749B23BD7DEF87B0EC579C28D4FEDFDE0B67F029FBAEEA57E3BD97
+格式：PE32+ x86-64，Windows GUI 子系统
+签名：无代码签名
+测试系统：Microsoft Windows NT 10.0.19045.0，x64
+
+本机文件的 SHA-256 与 Release 中公布的值完全一致，因此不是下载损坏。
+去除下载文件的 Zone.Identifier 后仍然同样崩溃，因此不是 SmartScreen 或
+“来自 Internet”标记造成的。
+
+
+二、可以稳定复现的现象
+----------------------
+
+双击或从命令行启动后，没有出现主窗口，进程立即退出。
+
+进程退出码：
+  十进制：-1073740791
+  十六进制：0xC0000409
+
+Windows Application Error（事件 ID 1000）连续多次记录相同结果：
+  错误应用程序：PyLite.exe 1.0.0.0
+  错误模块：C:\Windows\System32\USER32.dll
+  USER32.dll 版本：10.0.19041.6456
+  异常代码：0xc0000409
+  错误偏移：0x0000000000019ac4
+
+0xC0000409 是 fail-fast/栈缓冲区越界类状态码，但它不等于已经确认源码里存在
+普通的数组越界；在本例中，崩溃位置和发生时机更指向进程初始化/激活上下文。
+
+
+三、调试器定位结果
+------------------
+
+在 Windows 本机使用 GDB 对 wWinMain 设置硬件断点后：
+
+1. 断点从未命中；
+2. 程序在进入 wWinMain 之前已经崩溃；
+3. 当时调用栈包含：
+     USER32!UserClientDllInitialize
+     ntdll!RtlActivateActivationContextUnsafeFast
+
+因此第一排查方向不是 WM_CREATE、编辑器控件或业务代码，而是：
+
+- 嵌入式应用清单（activation context）；
+- 资源文件；
+- MinGW 运行时/链接组合；
+- 进程入口前的 DLL 初始化。
+
+
+四、当前源码中最可疑的问题
+--------------------------
+
+文件：pylite-win32/resources/app.manifest
+
+当前内容包含：
+
+  <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">
+    PerMonitorV2
+  </dpiAware>
+
+这是一个明显的清单写法错误。2005 命名空间的 dpiAware 元素使用 true、false、
+true/pm 等旧式值；PerMonitorV2 应放在 2016 命名空间的 dpiAwareness 元素中。
+
+建议改成兼容式写法，例如：
+
+  <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">
+    true/pm
+  </dpiAware>
+  <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">
+    PerMonitorV2, PerMonitor
+  </dpiAwareness>
+
+请同时用能够校验 Windows manifest schema/activation context 的工具检查完整清单，
+不要只确认 XML 语法正确。
+
+注意：以上是基于崩溃时机和清单内容得出的最高优先级嫌疑，尚未在当前 Windows
+机器上通过重编译 A/B 测试最终证明。交接时必须保留“已确认”和“推断”的区别。
+
+
+五、请在 Linux 端执行的修复与分组构建
+------------------------------------
+
+请至少产出下面几个临时构建，文件名彼此区分：
+
+A. PyLite-current-manifest.exe
+   使用当前源码和当前清单原样重建，作为基线。
+
+B. PyLite-fixed-manifest.exe
+   只修正 dpiAware/dpiAwareness，不改业务代码。这是优先候选。
+
+C. PyLite-no-manifest.exe
+   从 app.rc 中暂时移除 RT_MANIFEST，仅用于定位。必须通过正常重新链接生成，
+   不要用二进制裁剪工具直接删除 PE 资源。
+
+D. 如果 B、C 均失败，再增加一个非完全静态链接构建，或切换 MinGW 的
+   posix/win32 线程模型做对照，以排查静态 CRT/运行时初始化。
+
+每个构建都请输出：
+
+- 完整编译和链接命令；
+- MinGW GCC、binutils、mingw-w64 的精确版本；
+- file 输出；
+- objdump -p 的 PE 头、Subsystem、导入 DLL；
+- SHA-256；
+- 是否静态链接 libgcc/libstdc++；
+- 解出的最终 manifest 内容。
+
+不要在确认修复前覆盖 v1.0.0 Release 的原文件。
+
+
+六、构建脚本需要补强的验证
+--------------------------
+
+现有 build-win-x64.sh 只验证了：
+
+- Linux 核心测试；
+- 结构测试；
+- file 将结果识别为 PE32+ GUI；
+- 发布目录中只有一个 EXE。
+
+这些检查无法证明 EXE 能在 Windows 启动。请补充：
+
+1. manifest 静态校验，至少拒绝把 PerMonitorV2 写入旧 dpiAware 元素；
+2. 通过 Wine 做基础启动检查（如果服务器环境可用）；
+3. 最终仍保留真实 Windows 10/11 x64 冒烟测试作为发布门槛；
+4. 未经过真实 Windows 测试时，在 README/Release 中明确标记为候选构建。
+
+如果使用 Wine，建议给程序增加一个不创建完整界面的只读自检参数，例如
+--startup-self-test；不过它不能替代真实主窗口创建测试。
+
+
+七、新候选版本在 Windows 上必须验证的项目
+------------------------------------------
+
+最小启动验证：
+
+1. 双击 EXE 能打开窗口，保持运行至少 10 秒；
+2. 从 cmd/PowerShell 启动时不立即退出；
+3. 关闭窗口后进程正常退出，事件查看器没有新的 Application Error；
+4. 连续启动/关闭 5 次；
+5. 打开带中文路径和空格路径的 .py 文件。
+
+功能验证：
+
+1. 新建、打开、保存、另存为；
+2. Python 高亮和 Tab 补全；
+3. import json 后 json. 动态补全；
+4. 选择本机 Python，F5 运行并显示 stdout/stderr；
+5. 可拖动左/中/右分隔条和输出区高度；
+6. --register-open-with 后，.py 的“打开方式”候选中出现 PyLite；
+7. PyLite.exe file.py 能正确打开指定文件。
+
+
+八、交付要求
+------------
+
+请提交源码修复、构建脚本改动及新的候选 EXE，并在回复中明确：
+
+- 根因是否已经通过 A/B 构建确认；
+- 修改了哪些文件；
+- 新 EXE 的 SHA-256 和大小；
+- 哪些测试只在 Linux/Wine 完成；
+- 是否尚需本机 Windows 复测。
+
+在 Windows 实测确认之前，不要声称问题已经完全解决。
