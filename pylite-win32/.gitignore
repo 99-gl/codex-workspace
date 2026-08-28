@@ -1,5 +1,6 @@
 /build/
 /artifacts/
 *.exe
+!/PyLite.exe
 *.o
 *.log

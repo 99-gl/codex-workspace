@@ -39,7 +39,7 @@ cd pylite-win32
 ./scripts/build-win-x64.sh
 ```
 
-脚本运行 Linux 核心测试、界面结构检查、DPI manifest 静态校验、资源编译、静态链接和单文件验证。成品位于 `artifacts/win-x64/PyLite.exe`。静态校验会拒绝把 `PerMonitorV2` 写入旧版 `dpiAware` 节点，避免程序在进入 `wWinMain` 前因激活上下文初始化而退出。
+脚本运行 Linux 核心测试、界面结构检查、DPI manifest 静态校验、资源编译、静态链接和单文件验证。成品位于 `artifacts/win-x64/PyLite.exe`，并同步复制到项目根目录的 `PyLite.exe`，方便直接从仓库获取。静态校验会拒绝把 `PerMonitorV2` 写入旧版 `dpiAware` 节点，避免程序在进入 `wWinMain` 前因激活上下文初始化而退出。
 
 单独测试：
 
@@ -62,8 +62,8 @@ g++ -std=c++17 -O2 -Wall -Wextra tests/core_tests.cpp -o build/core_tests
 
 ## 已验证成品
 
-- 文件：`artifacts/win-x64/PyLite.exe`
+- 文件：`PyLite.exe`（仓库内副本）
 - 大小：3,932,771 bytes（约 3.8 MiB）
-- SHA-256：`1031528c0b749b23bd7def87b0ec579c28d4fedfde0b67f029fbaeea57e3bd97`
+- SHA-256：`0392420bdc76e3d5ad6fb315fce659b4d1eb59247486b324361fbc7629291bfe`
 - 格式：PE32+ x86-64，Windows GUI 子系统
-- 发布目录内容：仅 `PyLite.exe`
+- 状态：v1.0.1-rc.1 Windows 启动修复候选，等待 Windows 10 真机确认

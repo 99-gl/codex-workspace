@@ -44,6 +44,7 @@ if [[ "$file_count" -ne 1 || "$only_name" != "PyLite.exe" ]]; then
   exit 3
 fi
 file "$output/PyLite.exe" | rg -q 'PE32\+ executable \(GUI\) x86-64'
+cp "$output/PyLite.exe" "$root/PyLite.exe"
 echo "EXE: $output/PyLite.exe"
 du -h "$output/PyLite.exe"
 sha256sum "$output/PyLite.exe"
