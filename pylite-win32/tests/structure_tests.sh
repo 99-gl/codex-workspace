@@ -27,6 +27,17 @@ test -f "$problem/solution.py"
 test -f "$problem/test_solution.py"
 rg -q '最长递增子序列' "$problem/description.md"
 rg -q 'subprocess.run' "$problem/test_solution.py"
+[[ "$(find "$root/problems" -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 41 ]]
+[[ "$(find "$root/problems" -mindepth 2 -maxdepth 2 -type f | wc -l)" -eq 123 ]]
+[[ "$(find "$root/problems" -mindepth 2 -maxdepth 2 -name description.md | wc -l)" -eq 41 ]]
+[[ "$(find "$root/problems" -mindepth 2 -maxdepth 2 -name solution.py | wc -l)" -eq 41 ]]
+[[ "$(find "$root/problems" -mindepth 2 -maxdepth 2 -name test_solution.py | wc -l)" -eq 41 ]]
+[[ "$(rg -l '## 题目描述' "$root/problems" -g 'description.md' | wc -l)" -eq 41 ]]
+[[ "$(rg -l '## 输入格式' "$root/problems" -g 'description.md' | wc -l)" -eq 41 ]]
+[[ "$(rg -l '## 输出格式' "$root/problems" -g 'description.md' | wc -l)" -eq 41 ]]
+[[ "$(rg -l 'subprocess.run' "$root/problems" -g 'test_solution.py' | wc -l)" -eq 41 ]]
+! rg -q '来源|进阶|https?://' "$root/problems" -g 'description.md'
+[[ "$(find "$root/problems" -mindepth 2 -maxdepth 2 -name solution.py ! -path '*/0300-longest-increasing-subsequence/*' -size 0c | wc -l)" -eq 40 ]]
 rg -q '566' "$root/vendor/scintilla/version.txt"
 rg -q '553' "$root/vendor/lexilla/version.txt"
 echo "All structure tests passed"

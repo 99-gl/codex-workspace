@@ -55,6 +55,8 @@ PyLite Win32 界面改版：Linux 构建交接
 - 底栏新增输入/输出标签，自定义输入通过匿名管道送入 solution.py 的 stdin；
 - 顶部新增“测试”按钮，运行同目录 test_solution.py，并保留进程树停止能力；
 - 新增 Ctrl+F5 运行测试，F5 仍运行当前代码，Shift+F5 停止；
+- 题库扩展到 41 道：新增 40 道 ACM 格式题目、40 个空白 solution.py 和共 396 组固化测试；
+- 所有新增题面均不包含来源和进阶段落，链表、二叉树与多答案题明确了本地序列化及排序规则；
 
 
 需要特别核对的编译点
@@ -92,4 +94,6 @@ Windows 真机后续验证项
 - 打开 problems/0300-longest-increasing-subsequence/solution.py 后右侧显示题面；
 - 在输入标签填入样例，F5 应把内容传给 solution.py；
 - Ctrl+F5 应输出 10 组测试结果，空白 solution.py 初始应判定失败；
+- 左侧 problems 根目录应显示 41 个题目目录，随机抽查数组、链表、二叉树和动态规划题均能加载题面；
+- 新增题目的空白 solution.py 运行测试应失败，填写正确解答后应按各题固定顺序通过；
 - .py 打开方式和命令行打开文件。
