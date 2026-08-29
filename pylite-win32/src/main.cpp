@@ -177,7 +177,7 @@ void DrawOwnerButton(const DRAWITEMSTRUCT&d){
 LRESULT CALLBACK GutterProc(HWND h,UINT m,WPARAM w,LPARAM l){
   if(m==WM_ERASEBKGND)return 1;
   if(m==WM_PAINT){PAINTSTRUCT p;HDC dc=BeginPaint(h,&p);RECT r;GetClientRect(h,&r);PaintWithBrush(dc,r,gOutputBrush);
-    if(gEdit){CHARRANGE sel{};SendMessage(gEdit,EM_EXGETSEL,0,(LPARAM)&sel);int current=(int)SendMessage(gEdit,EM_LINEFROMCHAR,sel.cpMin,0);int first=(int)SendMessage(gEdit,EM_GETFIRSTVISIBLELINE,0,0),count=(int)SendMessage(gEdit,EM_GETLINECOUNT,0,0);int visibleBudget=std::max(8,r.bottom/std::max(1,S(16))+4),last=std::min(count,first+visibleBudget);
+    if(gEdit){CHARRANGE sel{};SendMessage(gEdit,EM_EXGETSEL,0,(LPARAM)&sel);int current=(int)SendMessage(gEdit,EM_LINEFROMCHAR,sel.cpMin,0);int first=(int)SendMessage(gEdit,EM_GETFIRSTVISIBLELINE,0,0),count=(int)SendMessage(gEdit,EM_GETLINECOUNT,0,0);int visibleBudget=std::max(8,(int)r.bottom/std::max(1,S(16))+4),last=std::min(count,first+visibleBudget);
       for(int line=first;line<last;line++){LONG index=(LONG)SendMessage(gEdit,EM_LINEINDEX,line,0);POINTL pos{};SendMessage(gEdit,EM_POSFROMCHAR,(WPARAM)&pos,index);if(pos.y>r.bottom)break;if(pos.y+S(22)<0)continue;RECT tr{S(3),(int)pos.y,r.right-S(8),(int)pos.y+S(22)};pylite_ui::Text(dc,std::to_wstring(line+1),tr,gSmallCodeFont,line==current?pylite_ui::Theme::TextSecondary:pylite_ui::Theme::TextMuted,DT_SINGLELINE|DT_TOP|DT_RIGHT);}}
     auto old=SelectObject(dc,gDividerPen);MoveToEx(dc,r.right-1,0,nullptr);LineTo(dc,r.right-1,r.bottom);SelectObject(dc,old);EndPaint(h,&p);return 0;}
   return DefWindowProcW(h,m,w,l);
