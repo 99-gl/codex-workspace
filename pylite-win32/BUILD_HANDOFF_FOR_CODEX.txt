@@ -47,6 +47,8 @@ PyLite Win32 界面改版：Linux 构建交接
 - 没有使用 WS_EX_COMPOSITED；
 - 删除 RichEdit 正文区的定时正则全文重着色和独立行号栏刷新路径；
 - 补全列表改用 Scintilla 原生自动补全窗口，保留原来的静态和 Python 模块动态补全来源；
+- 移除编辑器上重复的 Tab 子类拦截，候选确认完全交给 Scintilla 原生按键路径，避免补全后再插入一个制表符；
+- 动态属性补全会在输入点号后的前缀时持续生效，例如 collections.de 仍使用 collections 的属性候选并定位到 deque，而不会退回 def/del 等静态候选；
 - 构建新增 Scintilla/Lexilla 源码静态编译及系统 uxtheme、imm32、oleaut32 链接；
 - 修正 RichEdit 行距参数：1.4 倍行距使用 rule 5 + dyLineSpacing=28；
 - 编辑区滚动不再依赖异步 InvalidateRect 刷新行号，也不在滚动期间运行正则全文高亮。
@@ -90,6 +92,8 @@ Windows 真机后续验证项
 - 文件树展开、打开文件和系统图标；
 - 行号随编辑、滚动和光标移动同步；
 - 高亮、Tab 补全和模块动态补全；
+- 输入 coll 后按 Tab，应得到 collections 且光标紧跟单词末尾，不得额外缩进；
+- import collections 后输入 collections.de，候选应继续包含并定位到 deque/defaultdict，不得切换成 def/del/delattr；
 - stdout/stderr、退出码、折叠和清空；
 - 打开 problems/0300-longest-increasing-subsequence/solution.py 后右侧显示题面；
 - 在输入标签填入样例，F5 应把内容传给 solution.py；

@@ -7,6 +7,10 @@ int main(){
  auto c=StaticCompletions("def hello():\n x=1\nclass World:\n pass\nimport json\n"); ok(std::find(c.begin(),c.end(),"print")!=c.end(),"builtin"); ok(std::find(c.begin(),c.end(),"hello")!=c.end(),"function"); ok(std::find(c.begin(),c.end(),"World")!=c.end(),"class"); ok(std::find(c.begin(),c.end(),"json")!=c.end(),"import");
  auto i=ParseImports("import numpy as np\nfrom pathlib import Path as P, PurePath\n"); ok(i.aliases["np"]=="numpy","alias"); ok(i.aliases["P"]=="pathlib.Path","from alias"); ok(i.aliases["PurePath"]=="pathlib.PurePath","from");
  ok(AttributeContext("x = torch.nn.")=="torch.nn","nested attribute"); ok(ResolveModule(ParseImports("import torch\n"),"torch.nn")=="torch.nn","resolve nested");
+ auto plain=AttributeCompletionContext("value = collections.");ok(plain.expression=="collections"&&plain.prefix.empty(),"attribute completion without prefix");
+ auto typed=AttributeCompletionContext("value = collections.de");ok(typed.expression=="collections"&&typed.prefix=="de","attribute completion keeps prefix");
+ auto nested=AttributeCompletionContext("value = torch.nn.Li");ok(nested.expression=="torch.nn"&&nested.prefix=="Li","nested attribute completion prefix");
+ ok(!AttributeCompletionContext("value = ordinary_name"),"ordinary identifier is not attribute completion");
  ok(DetectPep263("# -*- coding: gbk -*-\nprint('x')") == "gbk","pep263"); ok(ParsePythonVersion("3.13.2\r\n")=="Python 3.13","version");
  ok(QuoteWindowsArg(L"C:\\中文 路径\\hello.py")==L"\"C:\\中文 路径\\hello.py\"","quote");
  LimitedBuffer b(10); b.Append("12345\n67890\nabc"); ok(b.Size()<=10,"buffer limit");
