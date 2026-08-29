@@ -255,10 +255,7 @@ void ListBoxX::Create(Window &parent_, int ctrlID_, Point location_, int lineHei
 	lineHeight = lineHeight_;
 	unicodeMode = unicodeMode_;
 	codePage = unicodeMode ? CpUtf8 : 0;
-	// The completion popup is a short, row-based list. GDI avoids the
-	// DirectWrite/D2D setup and bitmap scaling cost on every wheel repaint.
-	(void)technology_;
-	technology = Technology::Default;
+	technology = technology_;
 	HWND hwndParent = HwndFromWindow(*parent);
 	HINSTANCE hinstanceParent = GetWindowInstance(hwndParent);
 	// Window created as popup so not clipped within parent client area
