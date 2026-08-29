@@ -181,6 +181,7 @@ class ListBoxX : public ListBox {
 	}
 
 	LBGraphics graphics;
+	MouseWheelDelta wheelDelta;
 
 	HWND GetHWND() const noexcept;
 	void AppendListItem(const char *text, const char *numword);
@@ -950,18 +951,14 @@ LRESULT ListBoxX::WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam
 		}
 		return ::DefWindowProc(hWnd, iMessage, wParam, lParam);
 	case WM_MOUSEWHEEL:
-		if (lb) {
-			const int delta = GET_WHEEL_DELTA_WPARAM(wParam);
-			if (delta != 0) {
-				// React to high-resolution wheel input immediately instead of waiting
-				// for the deltas to accumulate to a full WHEEL_DELTA step.
-				const int rows = std::max(1, std::abs(delta) * 3 / WHEEL_DELTA);
-				const int direction = delta > 0 ? -1 : 1;
-				const int top = std::max(0, ListBox_GetTopIndex(lb) + direction * rows);
-				ListBox_SetTopIndex(lb, top);
-			}
+		if (wheelDelta.Accumulate(wParam)) {
+			const int nRows = GetVisibleRows();
+			int linesToScroll = std::clamp(nRows - 1, 1, 3);
+			linesToScroll *= wheelDelta.Actions();
+			const int top = std::max(0, ListBox_GetTopIndex(lb) + linesToScroll);
+			ListBox_SetTopIndex(lb, top);
 		}
-		return 0;
+		break;
 
 	default:
 		return ::DefWindowProc(hWnd, iMessage, wParam, lParam);
