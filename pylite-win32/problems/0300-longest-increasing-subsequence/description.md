@@ -1,7 +1,5 @@
 # 300. 最长递增子序列
 
-> 题目原型：[LeetCode 300](https://leetcode.cn/problems/longest-increasing-subsequence/description/)。本地版本已改写为 ACM 标准输入输出格式。
-
 ## 题目描述
 
 给定一个长度为 `n` 的整数序列，请求出其中最长严格递增子序列的长度。
@@ -46,7 +44,3 @@
 
 - `1 <= n <= 2500`
 - `-10000 <= ai <= 10000`
-
-## 进阶
-
-基础动态规划可以在 `O(n²)` 时间内完成。你还能设计出 `O(n log n)` 的算法吗？

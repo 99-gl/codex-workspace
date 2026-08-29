@@ -88,6 +88,7 @@ void RenderStatement(const fs::path&path){
   while(std::getline(stream,line)){
     if(!line.empty()&&line.back()==L'\r')line.pop_back();
     if(ext==L".md"&&line.rfind(L"```",0)==0){code=!code;continue;}
+    if(line.empty()&&!code)continue;
     int heading=0;if(ext==L".md"){while(heading<(int)line.size()&&line[(size_t)heading]==L'#')heading++;if(heading>0&&heading<=6&&(int)line.size()>heading&&line[(size_t)heading]==L' ')line.erase(0,(size_t)heading+1);else heading=0;if(line.rfind(L"- ",0)==0)line.replace(0,2,L"• ");if(!code)CleanInlineMarkdown(line);}
     LONG start=(LONG)text.size();text+=line;text+=L"\r";
     if(heading)spans.push_back({start,(LONG)line.size(),heading==1?18:(heading==2?14:12),true,false});
@@ -95,7 +96,7 @@ void RenderStatement(const fs::path&path){
   }
   SetWindowTextW(gStatement,text.c_str());SendMessage(gStatement,EM_SETSEL,0,-1);
   CHARFORMAT2W base{sizeof(base)};base.dwMask=CFM_FACE|CFM_SIZE|CFM_COLOR|CFM_BOLD|CFM_BACKCOLOR;base.yHeight=200;base.crTextColor=pylite_ui::Theme::TextPrimary;base.crBackColor=pylite_ui::Theme::PanelBackground;base.dwEffects=0;wcscpy_s(base.szFaceName,L"Segoe UI");SendMessage(gStatement,EM_SETCHARFORMAT,SCF_SELECTION,(LPARAM)&base);
-  PARAFORMAT2 paragraph{sizeof(paragraph)};paragraph.dwMask=PFM_LINESPACING|PFM_SPACEAFTER;paragraph.bLineSpacingRule=5;paragraph.dyLineSpacing=24;paragraph.dySpaceAfter=S(5)*15;SendMessage(gStatement,EM_SETPARAFORMAT,0,(LPARAM)&paragraph);
+  PARAFORMAT2 paragraph{sizeof(paragraph)};paragraph.dwMask=PFM_LINESPACING|PFM_SPACEAFTER;paragraph.bLineSpacingRule=5;paragraph.dyLineSpacing=22;paragraph.dySpaceAfter=70;SendMessage(gStatement,EM_SETPARAFORMAT,0,(LPARAM)&paragraph);
   for(const auto&span:spans){SendMessage(gStatement,EM_SETSEL,span.start,span.start+span.length);CHARFORMAT2W format{sizeof(format)};format.dwMask=CFM_FACE|CFM_SIZE|CFM_BOLD|CFM_COLOR|CFM_BACKCOLOR;format.yHeight=span.points*20;format.dwEffects=span.bold?CFE_BOLD:0;format.crTextColor=span.code?RGB(5,80,174):pylite_ui::Theme::TextPrimary;format.crBackColor=span.code?pylite_ui::Theme::OutputBackground:pylite_ui::Theme::PanelBackground;wcscpy_s(format.szFaceName,span.code?L"Cascadia Mono":L"Segoe UI");SendMessage(gStatement,EM_SETCHARFORMAT,SCF_SELECTION,(LPARAM)&format);}
   SendMessage(gStatement,EM_SETSEL,0,0);SendMessage(gStatement,EM_SETMODIFY,FALSE,0);
 }
