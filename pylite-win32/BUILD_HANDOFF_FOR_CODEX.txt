@@ -50,6 +50,11 @@ PyLite Win32 界面改版：Linux 构建交接
 - 构建新增 Scintilla/Lexilla 源码静态编译及系统 uxtheme、imm32、oleaut32 链接；
 - 修正 RichEdit 行距参数：1.4 倍行距使用 rule 5 + dyLineSpacing=28；
 - 编辑区滚动不再依赖异步 InvalidateRect 刷新行号，也不在滚动期间运行正则全文高亮。
+- 新增 problems/0300-longest-increasing-subsequence ACM 题目目录，包含题面、空白提交代码和 10 组测试；
+- 右侧待定区域改为原生 RichEdit 轻量 Markdown 题面，不引入 WebView2；
+- 底栏新增输入/输出标签，自定义输入通过匿名管道送入 solution.py 的 stdin；
+- 顶部新增“测试”按钮，运行同目录 test_solution.py，并保留进程树停止能力；
+- 新增 Ctrl+F5 运行测试，F5 仍运行当前代码，Shift+F5 停止；
 
 
 需要特别核对的编译点
@@ -84,4 +89,7 @@ Windows 真机后续验证项
 - 行号随编辑、滚动和光标移动同步；
 - 高亮、Tab 补全和模块动态补全；
 - stdout/stderr、退出码、折叠和清空；
+- 打开 problems/0300-longest-increasing-subsequence/solution.py 后右侧显示题面；
+- 在输入标签填入样例，F5 应把内容传给 solution.py；
+- Ctrl+F5 应输出 10 组测试结果，空白 solution.py 初始应判定失败；
 - .py 打开方式和命令行打开文件。

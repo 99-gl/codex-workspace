@@ -10,6 +10,8 @@ PyLite 是一个面向 Windows 10/11 x64 的轻量 Python 记事本。它是原�
 - Python 关键字、内置名称、函数、类、变量和 import 名称补全
 - 通过独立 Python 子进程为 `json.`、`numpy as np`、`torch.nn.` 等上下文获取动态属性补全
 - Python 解释器检测与选择，异步运行脚本，实时输出、退出码和进程树停止
+- ACM 刷题模式：右侧原生轻量 Markdown 题面、底部自定义输入/输出切换
+- `F5` 将输入区内容送入当前代码的标准输入；`Ctrl+F5` 运行题目自带测试脚本
 - 懒加载文件树，隐藏 `.git` 和 `__pycache__`
 - 可拖动左右栏和输出高度，输出区可折叠，布局写入 `%APPDATA%\PyLite\settings.json`
 - 当前用户范围注册 `.py`/`.pyw` 的“打开方式”，不改变默认程序
@@ -19,7 +21,9 @@ PyLite 是一个面向 Windows 10/11 x64 的轻量 Python 记事本。它是原�
 
 ## 使用
 
-复制唯一的 `PyLite.exe` 到任意目录即可运行，无需安装 .NET、Visual Studio 或 C++ 运行库。第一次启动会尝试从 PATH 检测 `python.exe`/`python3.exe`，也可在工具菜单或顶部选择器中手动选择。按 `F5` 运行，`Shift+F5` 停止，`Ctrl+J` 折叠输出区。
+`PyLite.exe` 本身无需安装 .NET、Visual Studio 或 C++ 运行库。第一次启动会尝试从 PATH 检测 `python.exe`/`python3.exe`，也可在工具菜单或顶部选择器中手动选择。按 `F5` 运行当前代码，`Ctrl+F5` 运行测试，`Shift+F5` 停止，`Ctrl+J` 折叠底栏。
+
+刷题时请保留 `problems` 目录与 `PyLite.exe` 同级。每道题是一个独立目录，包含 `description.md`（题面）、`solution.py`（提交代码）和 `test_solution.py`（本地测试）。程序会在打开题目代码时自动关联同目录题面与测试；`solution.py` 使用标准 ACM 输入输出，即从 `stdin` 读取并向 `stdout` 输出。
 
 补全列表在输入标识符时显示；方向键选择，Tab/Enter 接受，Esc 关闭。输入模块点号会启动所选 Python 的独立隐藏子进程。导入模块可能执行模块初始化代码，只应对可信 Python 环境使用动态补全。
 
@@ -55,12 +59,12 @@ g++ -std=c++17 -O2 -Wall -Wextra tests/core_tests.cpp -o build/core_tests
 
 ## 快捷键
 
-`Ctrl+N/O/Shift+O/S/Shift+S/Z/Y/A` 分别对应新建、打开文件、打开文件夹、保存、另存为、撤销、重做、全选；`F5` 运行，`Shift+F5` 停止，`Ctrl+J` 折叠输出区。
+`Ctrl+N/O/Shift+O/S/Shift+S/Z/Y/A` 分别对应新建、打开文件、打开文件夹、保存、另存为、撤销、重做、全选；`F5` 运行代码，`Ctrl+F5` 运行测试，`Shift+F5` 停止，`Ctrl+J` 折叠底栏。
 
 ## 当前限制
 
 - 只支持一个编辑文件，不含调试器、Git、终端、多标签、插件或环境管理。
-- 不向运行中的脚本提供 stdin。
+- 当前提供预先填写的标准输入，不支持运行期间进行交互式输入。
 - Linux 无法原生启动 Windows GUI；本次验证覆盖核心逻辑、资源、PE 架构和静态依赖，未声称真实 Windows GUI 测试。
 - 未做商业代码签名，Windows SmartScreen 可能提示“未知发布者”。
 

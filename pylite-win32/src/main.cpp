@@ -24,13 +24,13 @@
 #include "ui_theme.hpp"
 
 using namespace pylite; namespace fs=std::filesystem;
-constexpr int ID_TREE=100,ID_EDIT=101,ID_OUTPUT=102,ID_SAVE=103,ID_PY=104,ID_RUN=105,ID_CLEAR=106,ID_TOGGLE=107,ID_STATUS=108;
-enum {CMD_NEW=200,CMD_OPEN,CMD_FOLDER,CMD_SAVE,CMD_SAVEAS,CMD_EXIT,CMD_UNDO,CMD_REDO,CMD_CUT,CMD_COPY,CMD_PASTE,CMD_ALL,CMD_RUN,CMD_STOP,CMD_TOGGLE,CMD_SELECTPY,CMD_REGISTER,CMD_UNREGISTER,CMD_ABOUT};
+constexpr int ID_TREE=100,ID_EDIT=101,ID_OUTPUT=102,ID_SAVE=103,ID_PY=104,ID_RUN=105,ID_CLEAR=106,ID_TOGGLE=107,ID_STATUS=108,ID_TEST=109,ID_INPUT=110,ID_STATEMENT=111,ID_TAB_INPUT=112,ID_TAB_OUTPUT=113;
+enum {CMD_NEW=200,CMD_OPEN,CMD_FOLDER,CMD_SAVE,CMD_SAVEAS,CMD_EXIT,CMD_UNDO,CMD_REDO,CMD_CUT,CMD_COPY,CMD_PASTE,CMD_ALL,CMD_RUN,CMD_TEST,CMD_STOP,CMD_TOGGLE,CMD_SELECTPY,CMD_REGISTER,CMD_UNREGISTER,CMD_ABOUT};
 constexpr UINT WM_APPEND=WM_APP+1,WM_RUNEND=WM_APP+2,WM_INTERPRETER=WM_APP+3,WM_COMPLETIONS=WM_APP+4;
-HINSTANCE gInst{}; HWND gMain{},gTree{},gEdit{},gOutput{},gPy{},gRun{},gSave{},gFolder{},gClear{},gToggle{},gTooltip{}; HFONT gUiFont{},gUiMediumFont{},gCodeFont{},gIconFont{}; HBRUSH gAppBrush{},gPanelBrush{},gOutputBrush{},gHoverBrush{},gSelectedBrush{},gPrimaryBrush{},gPrimaryHoverBrush{},gSuccessBrush{},gErrorBrush{},gFocusBrush{},gMutedBrush{}; HPEN gBorderPen{},gDividerPen{}; HMENU gMenuBar{}; HIMAGELIST gSystemImageList{};
-std::wstring gFile,gRoot,gInterpreter,gEncoding=L"UTF-8",gStatusText=L"就绪",gPositionText=L"Ln 1, Col 1    UTF-8    Python"; bool gDirty=false,gOutputCollapsed=false,gRunning=false,gFormatting=false; int gLeft=230,gRight=260,gSavedOutput=180; int gDrag=0,gHotMenu=-1,gLastExit=-1; POINT gDragStart{}; int gDragValue{}; UINT gDpi=96;
+HINSTANCE gInst{}; HWND gMain{},gTree{},gEdit{},gOutput{},gInput{},gStatement{},gPy{},gRun{},gTest{},gSave{},gFolder{},gClear{},gToggle{},gInputTab{},gOutputTab{},gTooltip{}; HFONT gUiFont{},gUiMediumFont{},gCodeFont{},gIconFont{}; HBRUSH gAppBrush{},gPanelBrush{},gOutputBrush{},gHoverBrush{},gSelectedBrush{},gPrimaryBrush{},gPrimaryHoverBrush{},gSuccessBrush{},gErrorBrush{},gFocusBrush{},gMutedBrush{}; HPEN gBorderPen{},gDividerPen{}; HMENU gMenuBar{}; HIMAGELIST gSystemImageList{};
+std::wstring gFile,gRoot,gProblemDir,gInterpreter,gEncoding=L"UTF-8",gStatusText=L"就绪",gPositionText=L"Ln 1, Col 1    UTF-8    Python"; bool gDirty=false,gOutputCollapsed=false,gRunning=false,gRunningTests=false,gShowInput=false,gFormatting=false; int gLeft=230,gRight=360,gSavedOutput=180; int gDrag=0,gHotMenu=-1,gLastExit=-1; POINT gDragStart{}; int gDragValue{}; UINT gDpi=96;
 HANDLE gProcess=nullptr,gJob=nullptr; std::atomic<unsigned> gCompletionRequest{0}; std::map<std::wstring,std::vector<std::wstring>> gModuleCache; std::mutex gCacheMutex;
-int S(int value);void ApplyParagraphSpacing(HWND edit);void ConfigureEditor();void UpdateLineNumberMargin();
+int S(int value);void ApplyParagraphSpacing(HWND edit);void ConfigureEditor();void UpdateLineNumberMargin();void Layout();void LoadProblemForFile(const std::wstring&path);
 
 std::wstring W(const std::string&s){if(s.empty())return{};int n=MultiByteToWideChar(CP_UTF8,0,s.data(),(int)s.size(),nullptr,0);std::wstring o(n,0);MultiByteToWideChar(CP_UTF8,0,s.data(),(int)s.size(),o.data(),n);return o;}
 std::string U8(const std::wstring&s){if(s.empty())return{};int n=WideCharToMultiByte(CP_UTF8,0,s.data(),(int)s.size(),nullptr,0,nullptr,nullptr);std::string o(n,0);WideCharToMultiByte(CP_UTF8,0,s.data(),(int)s.size(),o.data(),n,nullptr,nullptr);return o;}
@@ -45,7 +45,7 @@ void SetEditorText(const std::wstring&s){gFormatting=true;auto bytes=U8(s);Sci(S
 void SaveSettings(){auto settings=SettingsPath();std::ofstream f(settings.c_str(),std::ios::binary);f<<"{\n  \"python\": \"";for(char c:U8(gInterpreter)){if(c=='\\'||c=='\"')f<<'\\';f<<c;}f<<"\",\n  \"left\": "<<gLeft<<",\n  \"right\": "<<gRight<<",\n  \"output\": "<<gSavedOutput<<",\n  \"collapsed\": "<<(gOutputCollapsed?"true":"false")<<",\n  \"folder\": \"";for(char c:U8(gRoot)){if(c=='\\'||c=='\"')f<<'\\';f<<c;}f<<"\"\n}\n";}
 std::string JsonString(const std::string&s,const char*key){std::smatch m;std::regex r(std::string("\\\"")+key+"\\\"\\s*:\\s*\\\"((?:\\\\.|[^\\\"])*)\\\"");if(!std::regex_search(s,m,r))return{};std::string o;bool esc=false;for(char c:m[1].str()){if(esc){o+=c;esc=false;}else if(c=='\\')esc=true;else o+=c;}return o;}
 int JsonInt(const std::string&s,const char*k,int d){std::smatch m;return std::regex_search(s,m,std::regex(std::string("\\\"")+k+"\\\"\\s*:\\s*(\\d+)"))?std::stoi(m[1].str()):d;}
-void LoadSettings(){auto settings=SettingsPath();std::ifstream f(settings.c_str(),std::ios::binary);if(!f)return;std::string s((std::istreambuf_iterator<char>(f)),{});try{gInterpreter=W(JsonString(s,"python"));gRoot=W(JsonString(s,"folder"));gLeft=std::clamp(JsonInt(s,"left",230),160,420);gRight=std::clamp(JsonInt(s,"right",260),160,420);gSavedOutput=std::clamp(JsonInt(s,"output",180),90,440);gOutputCollapsed=s.find("\"collapsed\": true")!=std::string::npos;}catch(...){gLeft=230;gRight=260;gSavedOutput=180;gOutputCollapsed=false;}}
+void LoadSettings(){auto settings=SettingsPath();std::ifstream f(settings.c_str(),std::ios::binary);if(!f)return;std::string s((std::istreambuf_iterator<char>(f)),{});try{gInterpreter=W(JsonString(s,"python"));gRoot=W(JsonString(s,"folder"));gLeft=std::clamp(JsonInt(s,"left",230),160,420);gRight=std::clamp(JsonInt(s,"right",360),160,420);gSavedOutput=std::clamp(JsonInt(s,"output",180),90,440);gOutputCollapsed=s.find("\"collapsed\": true")!=std::string::npos;}catch(...){gLeft=230;gRight=360;gSavedOutput=180;gOutputCollapsed=false;}}
 
 bool DecodeFile(const std::wstring&path,std::wstring&out){std::ifstream f(fs::path(path),std::ios::binary);if(!f){MessageBoxW(gMain,L"无法读取文件。",L"PyLite",MB_ICONERROR);return false;}std::string b((std::istreambuf_iterator<char>(f)),{});UINT cp=CP_UTF8;int off=0;if(b.size()>=3&&(unsigned char)b[0]==0xEF&&(unsigned char)b[1]==0xBB&&(unsigned char)b[2]==0xBF){off=3;gEncoding=L"UTF-8 BOM";}else{auto e=DetectPep263(b);if(e=="gbk"||e=="gb2312"||e=="cp936"){cp=936;gEncoding=L"GBK";}else if(e=="latin-1"||e=="iso-8859-1"){cp=28591;gEncoding=L"Latin-1";}else gEncoding=L"UTF-8";}int flags=cp==CP_UTF8?MB_ERR_INVALID_CHARS:0;int n=MultiByteToWideChar(cp,flags,b.data()+off,(int)b.size()-off,nullptr,0);if(n<=0&&b.size()>off){MessageBoxW(gMain,L"文件编码无法识别，未打开以避免损坏。",L"编码错误",MB_ICONERROR);return false;}out.resize(n);MultiByteToWideChar(cp,flags,b.data()+off,(int)b.size()-off,out.data(),n);return true;}
 bool SaveTo(const std::wstring&path){auto s=EditorText();UINT cp=gEncoding==L"GBK"?936:gEncoding==L"Latin-1"?28591:CP_UTF8;int n=WideCharToMultiByte(cp,WC_NO_BEST_FIT_CHARS,s.data(),(int)s.size(),nullptr,0,nullptr,nullptr);std::string b(n,0);BOOL used=FALSE;WideCharToMultiByte(cp,WC_NO_BEST_FIT_CHARS,s.data(),(int)s.size(),b.data(),n,nullptr,&used);if(used&&cp!=CP_UTF8){MessageBoxW(gMain,L"当前编码无法表示部分字符，请另存为 UTF-8。",L"编码错误",MB_ICONERROR);return false;}std::ofstream f(fs::path(path),std::ios::binary|std::ios::trunc);if(!f){MessageBoxW(gMain,L"无法保存文件。",L"PyLite",MB_ICONERROR);return false;}if(gEncoding==L"UTF-8 BOM")f.write("\xEF\xBB\xBF",3);f.write(b.data(),b.size());gFile=path;Sci(SCI_SETSAVEPOINT);gDirty=false;UpdateTitle();SetStatus(L"已保存");return true;}
@@ -58,7 +58,55 @@ int SystemIcon(const fs::path&p,bool dir){SHFILEINFOW info{};DWORD attr=dir?FILE
 HTREEITEM AddTree(HTREEITEM parent,const fs::path&p,bool dir){auto*stored=new std::wstring(p.wstring());TVINSERTSTRUCTW t{};t.hParent=parent;t.hInsertAfter=TVI_LAST;t.item.mask=TVIF_TEXT|TVIF_PARAM|TVIF_CHILDREN|TVIF_IMAGE|TVIF_SELECTEDIMAGE;auto label=p.filename().wstring();if(label.empty())label=p.wstring();t.item.pszText=(LPWSTR)label.c_str();t.item.lParam=(LPARAM)stored;t.item.cChildren=dir?1:0;t.item.iImage=t.item.iSelectedImage=SystemIcon(p,dir);auto h=TreeView_InsertItem(gTree,&t);if(dir)AddDummy(h);return h;}
 void LoadChildren(HTREEITEM h,const std::wstring&path){TreeView_DeleteItem(gTree,TreeView_GetChild(gTree,h));std::vector<fs::directory_entry> v;std::error_code ec;for(fs::directory_iterator it(path,fs::directory_options::skip_permission_denied,ec),end;it!=end&&!ec;it.increment(ec)){auto n=it->path().filename().wstring();if(n==L".git"||n==L"__pycache__")continue;v.push_back(*it);}std::sort(v.begin(),v.end(),[](auto&a,auto&b){if(a.is_directory()!=b.is_directory())return a.is_directory();auto x=a.path().filename().wstring(),y=b.path().filename().wstring();std::transform(x.begin(),x.end(),x.begin(),towlower);std::transform(y.begin(),y.end(),y.begin(),towlower);return x<y;});for(auto&e:v)AddTree(h,e.path(),e.is_directory(ec));}
 void SetRoot(const std::wstring&root){gRoot=root;TreeView_DeleteAllItems(gTree);if(root.empty())return;auto h=AddTree(TVI_ROOT,fs::path(root),true);LoadChildren(h,root);TreeView_Expand(gTree,h,TVE_EXPAND);SaveSettings();}
-void OpenFile(const std::wstring&p){if(!ConfirmDiscard())return;auto ext=fs::path(p).extension().wstring();std::transform(ext.begin(),ext.end(),ext.begin(),towlower);if(ext!=L".py"&&ext!=L".pyw"){SetStatus(L"当前仅支持 .py 和 .pyw");return;}std::wstring s;if(!DecodeFile(p,s))return;gFile=p;SetEditorText(s);SetStatus(L"已打开文件");if(gRoot.empty())SetRoot(fs::path(p).parent_path().wstring());SetFocus(gEdit);}
+
+std::wstring WindowText(HWND h){int n=GetWindowTextLengthW(h);std::vector<wchar_t> buffer((size_t)n+1);GetWindowTextW(h,buffer.data(),n+1);return std::wstring(buffer.data(),(size_t)n);}
+std::wstring ReadUtf8(const fs::path&path){std::ifstream f(path,std::ios::binary);if(!f)return{};std::string bytes((std::istreambuf_iterator<char>(f)),{});if(bytes.size()>=3&&(unsigned char)bytes[0]==0xEF&&(unsigned char)bytes[1]==0xBB&&(unsigned char)bytes[2]==0xBF)bytes.erase(0,3);return W(bytes);}
+std::wstring ExecutableDirectory(){wchar_t path[32768]{};GetModuleFileNameW(nullptr,path,ARRAYSIZE(path));return fs::path(path).parent_path().wstring();}
+std::wstring BundledProblems(){auto p=fs::path(ExecutableDirectory())/L"problems";return fs::exists(p)?p.wstring():L"";}
+
+struct StatementSpan{LONG start{},length{};int points{};bool bold{},code{};};
+void CleanInlineMarkdown(std::wstring&line){
+  line=std::regex_replace(line,std::wregex(L"\\[([^\\]]+)\\]\\(([^\\)]+)\\)"),L"$1 ($2)");
+  line.erase(std::remove(line.begin(),line.end(),L'`'),line.end());
+  for(const auto*marker:{L"**",L"__"}){size_t pos=0;while((pos=line.find(marker,pos))!=std::wstring::npos)line.erase(pos,2);}
+  if(line.rfind(L"> ",0)==0)line.erase(0,2);
+}
+std::wstring HtmlToText(std::wstring html){
+  html=std::regex_replace(html,std::wregex(L"<(br|BR)\\s*/?>"),L"\r\n");
+  html=std::regex_replace(html,std::wregex(L"</(p|P|div|DIV|h[1-6]|H[1-6]|li|LI)>"),L"\r\n");
+  html=std::regex_replace(html,std::wregex(L"<(li|LI)[^>]*>"),L"• ");
+  html=std::regex_replace(html,std::wregex(L"<[^>]+>"),L"");
+  const std::pair<const wchar_t*,const wchar_t*> entities[]={{L"&lt;",L"<"},{L"&gt;",L">"},{L"&amp;",L"&"},{L"&quot;",L"\""},{L"&nbsp;",L" "}};
+  for(auto&e:entities){size_t pos=0;while((pos=html.find(e.first,pos))!=std::wstring::npos){html.replace(pos,wcslen(e.first),e.second);pos+=wcslen(e.second);}}
+  return html;
+}
+void RenderStatement(const fs::path&path){
+  if(!gStatement)return;auto source=ReadUtf8(path);if(source.empty()){SetWindowTextW(gStatement,L"题面为空或无法读取。");return;}
+  auto ext=path.extension().wstring();std::transform(ext.begin(),ext.end(),ext.begin(),towlower);
+  if(ext==L".html"||ext==L".htm")source=HtmlToText(source);
+  std::wistringstream stream(source);std::wstring line,text;std::vector<StatementSpan> spans;bool code=false;
+  while(std::getline(stream,line)){
+    if(!line.empty()&&line.back()==L'\r')line.pop_back();
+    if(ext==L".md"&&line.rfind(L"```",0)==0){code=!code;continue;}
+    int heading=0;if(ext==L".md"){while(heading<(int)line.size()&&line[(size_t)heading]==L'#')heading++;if(heading>0&&heading<=6&&(int)line.size()>heading&&line[(size_t)heading]==L' ')line.erase(0,(size_t)heading+1);else heading=0;if(line.rfind(L"- ",0)==0)line.replace(0,2,L"• ");if(!code)CleanInlineMarkdown(line);}
+    LONG start=(LONG)text.size();text+=line;text+=L"\r";
+    if(heading)spans.push_back({start,(LONG)line.size(),heading==1?18:(heading==2?14:12),true,false});
+    else if(code)spans.push_back({start,(LONG)line.size()+1,10,false,true});
+  }
+  SetWindowTextW(gStatement,text.c_str());SendMessage(gStatement,EM_SETSEL,0,-1);
+  CHARFORMAT2W base{sizeof(base)};base.dwMask=CFM_FACE|CFM_SIZE|CFM_COLOR|CFM_BOLD|CFM_BACKCOLOR;base.yHeight=200;base.crTextColor=pylite_ui::Theme::TextPrimary;base.crBackColor=pylite_ui::Theme::PanelBackground;base.dwEffects=0;wcscpy_s(base.szFaceName,L"Segoe UI");SendMessage(gStatement,EM_SETCHARFORMAT,SCF_SELECTION,(LPARAM)&base);
+  PARAFORMAT2 paragraph{sizeof(paragraph)};paragraph.dwMask=PFM_LINESPACING|PFM_SPACEAFTER;paragraph.bLineSpacingRule=5;paragraph.dyLineSpacing=24;paragraph.dySpaceAfter=S(5)*15;SendMessage(gStatement,EM_SETPARAFORMAT,0,(LPARAM)&paragraph);
+  for(const auto&span:spans){SendMessage(gStatement,EM_SETSEL,span.start,span.start+span.length);CHARFORMAT2W format{sizeof(format)};format.dwMask=CFM_FACE|CFM_SIZE|CFM_BOLD|CFM_COLOR|CFM_BACKCOLOR;format.yHeight=span.points*20;format.dwEffects=span.bold?CFE_BOLD:0;format.crTextColor=span.code?RGB(5,80,174):pylite_ui::Theme::TextPrimary;format.crBackColor=span.code?pylite_ui::Theme::OutputBackground:pylite_ui::Theme::PanelBackground;wcscpy_s(format.szFaceName,span.code?L"Cascadia Mono":L"Segoe UI");SendMessage(gStatement,EM_SETCHARFORMAT,SCF_SELECTION,(LPARAM)&format);}
+  SendMessage(gStatement,EM_SETSEL,0,0);SendMessage(gStatement,EM_SETMODIFY,FALSE,0);
+}
+fs::path DescriptionFor(const fs::path&dir){for(auto name:{L"description.md",L"description.html",L"description.htm"}){auto p=dir/name;if(fs::is_regular_file(p))return p;}return{};}
+void LoadProblemForFile(const std::wstring&path){
+  fs::path p(path),dir=fs::is_directory(p)?p:p.parent_path();auto description=DescriptionFor(dir);
+  if(description.empty()){gProblemDir.clear();SetWindowTextW(gStatement,L"从左侧打开题目目录中的 solution.py，即可在这里阅读题面。");InvalidateRect(gMain,nullptr,FALSE);return;}
+  gProblemDir=dir.wstring();RenderStatement(description);if(gRight<300)gRight=360;Layout();InvalidateRect(gMain,nullptr,FALSE);
+}
+void OpenFile(const std::wstring&p){if(!ConfirmDiscard())return;auto ext=fs::path(p).extension().wstring();std::transform(ext.begin(),ext.end(),ext.begin(),towlower);if(ext!=L".py"&&ext!=L".pyw"){SetStatus(L"当前仅支持 .py 和 .pyw");return;}std::wstring s;if(!DecodeFile(p,s))return;gFile=p;SetEditorText(s);LoadProblemForFile(p);SetStatus(L"已打开文件");if(gRoot.empty())SetRoot(fs::path(p).parent_path().wstring());SetFocus(gEdit);}
+void OpenTreePath(const std::wstring&p){auto path=fs::path(p);auto name=path.filename().wstring();std::transform(name.begin(),name.end(),name.begin(),towlower);if(name==L"description.md"||name==L"description.html"||name==L"description.htm"){auto solution=path.parent_path()/L"solution.py";if(fs::exists(solution))OpenFile(solution.wstring());else LoadProblemForFile(p);return;}OpenFile(p);}
 
 int S(int value){return pylite_ui::Scale(value,gDpi);}
 
@@ -114,8 +162,8 @@ void CreateUiResources(){
 }
 
 void SetControlFonts(){
-  for(HWND x:{gTree,gPy,gRun,gSave,gFolder,gClear,gToggle})if(x)SendMessage(x,WM_SETFONT,(WPARAM)gUiFont,TRUE);
-  if(gOutput)SendMessage(gOutput,WM_SETFONT,(WPARAM)gCodeFont,TRUE);
+  for(HWND x:{gTree,gPy,gRun,gTest,gSave,gFolder,gClear,gToggle,gInputTab,gOutputTab,gStatement})if(x)SendMessage(x,WM_SETFONT,(WPARAM)gUiFont,TRUE);
+  for(HWND x:{gOutput,gInput})if(x)SendMessage(x,WM_SETFONT,(WPARAM)gCodeFont,TRUE);
 }
 
 void AddTooltip(HWND target,const wchar_t*text){
@@ -177,11 +225,14 @@ LRESULT CALLBACK ButtonProc(HWND h,UINT m,WPARAM w,LPARAM l,UINT_PTR,DWORD_PTR){
 void DrawOwnerButton(const DRAWITEMSTRUCT&d){
   RECT r=d.rcItem;const bool hot=GetWindowLongPtrW(d.hwndItem,GWLP_USERDATA)!=0,pressed=(d.itemState&ODS_SELECTED)!=0,disabled=(d.itemState&ODS_DISABLED)!=0;
   const int radius=S(5),id=(int)d.CtlID;HBRUSH fill=gPanelBrush;COLORREF text=pylite_ui::Theme::TextPrimary;
+  const bool selectedTab=(id==ID_TAB_INPUT&&gShowInput)||(id==ID_TAB_OUTPUT&&!gShowInput);
   if(id==ID_RUN){fill=(hot||pressed)?gPrimaryHoverBrush:gPrimaryBrush;text=pylite_ui::Theme::PrimaryButtonText;}
+  else if(id==ID_TEST){fill=(hot||pressed)?gHoverBrush:gPanelBrush;}
+  else if(id==ID_TAB_INPUT||id==ID_TAB_OUTPUT){fill=selectedTab?gSelectedBrush:gPanelBrush;text=selectedTab?pylite_ui::Theme::SelectedText:pylite_ui::Theme::TextSecondary;}
   else if(id==ID_PY){fill=(hot||pressed)?gHoverBrush:gAppBrush;}
   else if(hot||pressed)fill=gHoverBrush;
   PaintWithBrush(d.hDC,r,gPanelBrush);PaintRounded(d.hDC,r,fill,radius);
-  if(id==ID_PY)StrokeRounded(d.hDC,r,gBorderPen,radius);
+  if(id==ID_PY||id==ID_TEST)StrokeRounded(d.hDC,r,gBorderPen,radius);
   if((d.itemState&ODS_FOCUS)&&id!=ID_RUN){RECT f=r;InflateRect(&f,-S(2),-S(2));StrokeRounded(d.hDC,f,gBorderPen,radius);}
   if(id==ID_PY){
     RECT dot{r.left+S(12),r.top+(r.bottom-r.top-S(7))/2,r.left+S(19),r.top+(r.bottom-r.top+S(7))/2};
@@ -189,7 +240,7 @@ void DrawOwnerButton(const DRAWITEMSTRUCT&d){
     wchar_t value[128]{};GetWindowTextW(d.hwndItem,value,128);RECT tx=r;tx.left+=S(27);tx.right-=S(22);pylite_ui::Text(d.hDC,value,tx,gUiFont,disabled?pylite_ui::Theme::TextMuted:text,DT_SINGLELINE|DT_VCENTER|DT_LEFT|DT_END_ELLIPSIS);
     RECT arrow{r.right-S(22),r.top,r.right-S(7),r.bottom};pylite_ui::Text(d.hDC,L"\xE70D",arrow,gIconFont,pylite_ui::Theme::TextSecondary,DT_SINGLELINE|DT_VCENTER|DT_CENTER);return;
   }
-  if(id==ID_RUN){wchar_t value[64]{};GetWindowTextW(d.hwndItem,value,64);pylite_ui::Text(d.hDC,value,r,gUiMediumFont,text,DT_SINGLELINE|DT_VCENTER|DT_CENTER);return;}
+  if(id==ID_RUN||id==ID_TEST||id==ID_TAB_INPUT||id==ID_TAB_OUTPUT){wchar_t value[64]{};GetWindowTextW(d.hwndItem,value,64);pylite_ui::Text(d.hDC,value,r,(id==ID_RUN||id==ID_TEST||selectedTab)?gUiMediumFont:gUiFont,disabled?pylite_ui::Theme::TextMuted:text,DT_SINGLELINE|DT_VCENTER|DT_CENTER);return;}
   std::wstring glyph;
   if(id==ID_SAVE)glyph=L"\xE74E";else if(id==CMD_FOLDER)glyph=L"\xE838";else if(id==ID_CLEAR)glyph=L"\xE74D";else if(id==ID_TOGGLE)glyph=gOutputCollapsed?L"\xE70D":L"\xE70E";
   pylite_ui::Text(d.hDC,glyph,r,gIconFont,disabled?pylite_ui::Theme::TextMuted:pylite_ui::Theme::TextSecondary,DT_SINGLELINE|DT_VCENTER|DT_CENTER);
@@ -197,19 +248,23 @@ void DrawOwnerButton(const DRAWITEMSTRUCT&d){
 
 void Layout(){
   if(!gMain)return;auto u=MeasureLayout();const int cardInset=S(1);
-  HDWP d=BeginDeferWindowPos(9);
+  HDWP d=BeginDeferWindowPos(14);
   auto place=[&](HWND h,const RECT&r){if(h)d=DeferWindowPos(d,h,nullptr,r.left,r.top,(int)std::max<LONG>(0,r.right-r.left),(int)std::max<LONG>(0,r.bottom-r.top),SWP_NOZORDER|SWP_NOACTIVATE);};
   RECT tree{u.leftPanel.left+S(8),u.leftHeader.bottom,u.leftPanel.right-S(8),u.leftPanel.bottom-S(8)};place(gTree,tree);
   RECT edit{u.editorCard.left+cardInset,u.editorCard.top+cardInset,u.editorCard.right-cardInset,u.editorCard.bottom-cardInset};place(gEdit,edit);
-  RECT output{u.outputCard.left+cardInset,u.outputHeader.bottom,u.outputCard.right-cardInset,u.outputCard.bottom-cardInset};place(gOutput,output);
-  RECT save{u.client.right-S(278),S(7),u.client.right-S(246),S(39)};place(gSave,save);
-  RECT py{u.client.right-S(238),S(7),u.client.right-S(92),S(39)};place(gPy,py);
+  RECT bottomContent{u.outputCard.left+cardInset,u.outputHeader.bottom,u.outputCard.right-cardInset,u.outputCard.bottom-cardInset};place(gOutput,bottomContent);place(gInput,bottomContent);
+  RECT statement{u.rightPanel.left+S(8),u.rightHeader.bottom,u.rightPanel.right-S(8),u.rightPanel.bottom-S(8)};place(gStatement,statement);
+  RECT save{u.client.right-S(374),S(7),u.client.right-S(342),S(39)};place(gSave,save);
+  RECT py{u.client.right-S(334),S(7),u.client.right-S(188),S(39)};place(gPy,py);
+  RECT test{u.client.right-S(180),S(7),u.client.right-S(92),S(39)};place(gTest,test);
   RECT run{u.client.right-S(84),S(7),u.client.right-S(12),S(39)};place(gRun,run);
   RECT folder{u.leftPanel.right-S(40),u.leftHeader.top+S(5),u.leftPanel.right-S(8),u.leftHeader.top+S(37)};place(gFolder,folder);
   RECT clear{u.outputHeader.right-S(72),u.outputHeader.top+S(1),u.outputHeader.right-S(40),u.outputHeader.bottom-S(1)};place(gClear,clear);
   RECT toggle{u.outputHeader.right-S(36),u.outputHeader.top+S(1),u.outputHeader.right-S(4),u.outputHeader.bottom-S(1)};place(gToggle,toggle);
+  RECT inputTab{u.outputHeader.left+S(8),u.outputHeader.top+S(3),u.outputHeader.left+S(66),u.outputHeader.bottom-S(3)};place(gInputTab,inputTab);
+  RECT outputTab{u.outputHeader.left+S(70),u.outputHeader.top+S(3),u.outputHeader.left+S(128),u.outputHeader.bottom-S(3)};place(gOutputTab,outputTab);
   if(d)EndDeferWindowPos(d);
-  ShowWindow(gOutput,gOutputCollapsed?SW_HIDE:SW_SHOW);
+  ShowWindow(gOutput,gOutputCollapsed||gShowInput?SW_HIDE:SW_SHOW);ShowWindow(gInput,gOutputCollapsed||!gShowInput?SW_HIDE:SW_SHOW);
 }
 
 void PaintMain(HDC dc){
@@ -218,11 +273,9 @@ void PaintMain(HDC dc){
   auto old=SelectObject(dc,gDividerPen);MoveToEx(dc,0,u.command.bottom-1,nullptr);LineTo(dc,u.client.right,u.command.bottom-1);MoveToEx(dc,0,u.status.top,nullptr);LineTo(dc,u.client.right,u.status.top);MoveToEx(dc,u.leftSplit+S(2),u.command.bottom,nullptr);LineTo(dc,u.leftSplit+S(2),u.status.top);MoveToEx(dc,u.rightSplit-S(2),u.command.bottom,nullptr);LineTo(dc,u.rightSplit-S(2),u.status.top);SelectObject(dc,old);
   const wchar_t*menus[]={L"文件",L"编辑",L"运行",L"工具"};for(int i=0;i<4;i++){RECT r=MenuRect(i);if(gHotMenu==i)PaintRounded(dc,r,gHoverBrush,S(4));pylite_ui::Text(dc,menus[i],r,gUiFont,pylite_ui::Theme::TextPrimary,DT_SINGLELINE|DT_VCENTER|DT_CENTER);}
   RECT leftTitle{u.leftHeader.left+S(12),u.leftHeader.top,u.leftHeader.right-S(44),u.leftHeader.bottom};pylite_ui::Text(dc,L"资源管理器",leftTitle,gUiMediumFont,pylite_ui::Theme::TextPrimary,DT_SINGLELINE|DT_VCENTER|DT_LEFT|DT_END_ELLIPSIS);
-  RECT rightTitle{u.rightHeader.left+S(12),u.rightHeader.top,u.rightHeader.right-S(12),u.rightHeader.bottom};pylite_ui::Text(dc,L"辅助面板",rightTitle,gUiMediumFont,pylite_ui::Theme::TextPrimary,DT_SINGLELINE|DT_VCENTER|DT_LEFT);
-  RECT empty{u.rightPanel.left+S(12),u.rightHeader.bottom+S(22),u.rightPanel.right-S(12),u.rightHeader.bottom+S(48)};pylite_ui::Text(dc,L"暂无内容",empty,gUiFont,pylite_ui::Theme::TextMuted,DT_SINGLELINE|DT_TOP|DT_CENTER);
-  RECT outputTitle{u.outputHeader.left+S(12),u.outputHeader.top,u.outputHeader.left+S(110),u.outputHeader.bottom};pylite_ui::Text(dc,L"输出",outputTitle,gUiMediumFont,pylite_ui::Theme::TextPrimary,DT_SINGLELINE|DT_VCENTER|DT_LEFT);
-  HBRUSH stateBrush=gRunning?gFocusBrush:(gLastExit==0?gSuccessBrush:(gLastExit>0?gErrorBrush:gMutedBrush));auto oldBrush=SelectObject(dc,stateBrush);auto oldPen=SelectObject(dc,GetStockObject(NULL_PEN));int dotX=u.outputHeader.left+S(58),dotY=(u.outputHeader.top+u.outputHeader.bottom)/2;Ellipse(dc,dotX-S(3),dotY-S(3),dotX+S(3),dotY+S(3));SelectObject(dc,oldPen);SelectObject(dc,oldBrush);
-  RECT state{dotX+S(8),u.outputHeader.top,u.outputHeader.left+S(180),u.outputHeader.bottom};std::wstring stateText=gRunning?L"正在运行":(gLastExit==0?L"已完成":(gLastExit>0?L"运行失败":L"尚未运行"));pylite_ui::Text(dc,stateText,state,gUiFont,pylite_ui::Theme::TextSecondary,DT_SINGLELINE|DT_VCENTER|DT_LEFT);
+  RECT rightTitle{u.rightHeader.left+S(12),u.rightHeader.top,u.rightHeader.right-S(12),u.rightHeader.bottom};pylite_ui::Text(dc,L"题目描述",rightTitle,gUiMediumFont,pylite_ui::Theme::TextPrimary,DT_SINGLELINE|DT_VCENTER|DT_LEFT);
+  HBRUSH stateBrush=gRunning?gFocusBrush:(gLastExit==0?gSuccessBrush:(gLastExit>0?gErrorBrush:gMutedBrush));auto oldBrush=SelectObject(dc,stateBrush);auto oldPen=SelectObject(dc,GetStockObject(NULL_PEN));int dotX=u.outputHeader.left+S(146),dotY=(u.outputHeader.top+u.outputHeader.bottom)/2;Ellipse(dc,dotX-S(3),dotY-S(3),dotX+S(3),dotY+S(3));SelectObject(dc,oldPen);SelectObject(dc,oldBrush);
+  RECT state{dotX+S(8),u.outputHeader.top,u.outputHeader.left+S(260),u.outputHeader.bottom};std::wstring stateText=gRunning?(gRunningTests?L"正在测试":L"正在运行"):(gLastExit==0?L"已完成":(gLastExit>0?L"运行失败":L"尚未运行"));pylite_ui::Text(dc,stateText,state,gUiFont,pylite_ui::Theme::TextSecondary,DT_SINGLELINE|DT_VCENTER|DT_LEFT);
   RECT statusLeft{S(10),u.status.top,u.status.right/2,u.status.bottom};pylite_ui::Text(dc,gStatusText,statusLeft,gUiFont,pylite_ui::Theme::TextSecondary,DT_SINGLELINE|DT_VCENTER|DT_LEFT|DT_END_ELLIPSIS);
   RECT statusRight{u.status.right/2,u.status.top,u.status.right-S(10),u.status.bottom};pylite_ui::Text(dc,gPositionText,statusRight,gUiFont,pylite_ui::Theme::TextSecondary,DT_SINGLELINE|DT_VCENTER|DT_RIGHT|DT_END_ELLIPSIS);
 }
@@ -233,8 +286,24 @@ void DetectPython(){std::thread(ValidatePython,gInterpreter).detach();}
 void ChoosePython(){wchar_t p[32768]{};OPENFILENAMEW o{sizeof(o)};o.hwndOwner=gMain;o.lpstrFile=p;o.nMaxFile=32768;o.lpstrFilter=L"Python (python.exe)\0python.exe\0可执行文件\0*.exe\0";o.Flags=OFN_FILEMUSTEXIST|OFN_EXPLORER;if(GetOpenFileNameW(&o))std::thread(ValidatePython,std::wstring(p)).detach();}
 
 void AppendOutput(const std::wstring&s){int n=GetWindowTextLengthW(gOutput);if(n>4*1024*1024){SendMessage(gOutput,EM_SETSEL,0,n-3*1024*1024);SendMessage(gOutput,EM_REPLACESEL,FALSE,(LPARAM)L"");}SendMessage(gOutput,EM_SETSEL,-1,-1);SendMessage(gOutput,EM_REPLACESEL,FALSE,(LPARAM)s.c_str());SendMessage(gOutput,EM_SCROLLCARET,0,0);}
-void RunWorker(std::wstring exe,std::wstring file){SECURITY_ATTRIBUTES sa{sizeof(sa),nullptr,TRUE};HANDLE rd,wr;CreatePipe(&rd,&wr,&sa,0);SetHandleInformation(rd,HANDLE_FLAG_INHERIT,0);STARTUPINFOW si{sizeof(si)};si.dwFlags=STARTF_USESTDHANDLES;si.hStdOutput=si.hStdError=wr;PROCESS_INFORMATION pi{};std::wstring cmd=QuoteWindowsArg(exe)+L" -u "+QuoteWindowsArg(file);auto cwd=fs::path(file).parent_path().wstring();SetEnvironmentVariableW(L"PYTHONIOENCODING",L"utf-8");BOOL ok=CreateProcessW(exe.c_str(),cmd.data(),nullptr,nullptr,TRUE,CREATE_NO_WINDOW|CREATE_NEW_PROCESS_GROUP,nullptr,cwd.c_str(),&si,&pi);CloseHandle(wr);if(!ok){CloseHandle(rd);PostMessage(gMain,WM_RUNEND,1,GetLastError());return;}gProcess=pi.hProcess;gJob=CreateJobObjectW(nullptr,nullptr);JOBOBJECT_EXTENDED_LIMIT_INFORMATION ji{};ji.BasicLimitInformation.LimitFlags=JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;SetInformationJobObject(gJob,JobObjectExtendedLimitInformation,&ji,sizeof(ji));AssignProcessToJobObject(gJob,pi.hProcess);CloseHandle(pi.hThread);char b[4096];DWORD n;while(ReadFile(rd,b,sizeof(b),&n,nullptr)&&n)PostMessage(gMain,WM_APPEND,0,(LPARAM)new std::wstring(W(std::string(b,n))));CloseHandle(rd);DWORD ec;WaitForSingleObject(pi.hProcess,INFINITE);GetExitCodeProcess(pi.hProcess,&ec);CloseHandle(pi.hProcess);gProcess=nullptr;if(gJob){CloseHandle(gJob);gJob=nullptr;}PostMessage(gMain,WM_RUNEND,0,ec);}
-void StartRun(){if(gRunning)return;if(gFile.empty()||gDirty){SendMessage(gMain,WM_COMMAND,CMD_SAVE,0);if(gFile.empty()||gDirty)return;}if(gInterpreter.empty()){SetStatus(L"请先选择 Python 解释器");ChoosePython();return;}SetWindowTextW(gOutput,L"");gOutputCollapsed=false;gRunning=true;gLastExit=-1;SetWindowTextW(gRun,L"■ 停止");SetStatus(L"正在运行");Layout();InvalidateRect(gMain,nullptr,FALSE);std::thread(RunWorker,gInterpreter,gFile).detach();}
+void RunWorker(std::wstring exe,std::wstring file,std::wstring input){
+  SECURITY_ATTRIBUTES sa{sizeof(sa),nullptr,TRUE};HANDLE outRead{},outWrite{},inRead{},inWrite{};
+  if(!CreatePipe(&outRead,&outWrite,&sa,0)||!CreatePipe(&inRead,&inWrite,&sa,0)){if(outRead)CloseHandle(outRead);if(outWrite)CloseHandle(outWrite);if(inRead)CloseHandle(inRead);if(inWrite)CloseHandle(inWrite);PostMessage(gMain,WM_RUNEND,0,1);return;}
+  SetHandleInformation(outRead,HANDLE_FLAG_INHERIT,0);SetHandleInformation(inWrite,HANDLE_FLAG_INHERIT,0);
+  STARTUPINFOW si{sizeof(si)};si.dwFlags=STARTF_USESTDHANDLES;si.hStdOutput=si.hStdError=outWrite;si.hStdInput=inRead;PROCESS_INFORMATION pi{};
+  std::wstring cmd=QuoteWindowsArg(exe)+L" -u "+QuoteWindowsArg(file);auto cwd=fs::path(file).parent_path().wstring();SetEnvironmentVariableW(L"PYTHONIOENCODING",L"utf-8");
+  BOOL ok=CreateProcessW(exe.c_str(),cmd.data(),nullptr,nullptr,TRUE,CREATE_NO_WINDOW|CREATE_NEW_PROCESS_GROUP,nullptr,cwd.c_str(),&si,&pi);CloseHandle(outWrite);CloseHandle(inRead);
+  if(!ok){CloseHandle(outRead);CloseHandle(inWrite);PostMessage(gMain,WM_RUNEND,0,1);return;}
+  gProcess=pi.hProcess;gJob=CreateJobObjectW(nullptr,nullptr);JOBOBJECT_EXTENDED_LIMIT_INFORMATION ji{};ji.BasicLimitInformation.LimitFlags=JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;SetInformationJobObject(gJob,JobObjectExtendedLimitInformation,&ji,sizeof(ji));AssignProcessToJobObject(gJob,pi.hProcess);CloseHandle(pi.hThread);
+  auto bytes=U8(input);size_t offset=0;while(offset<bytes.size()){DWORD written=0;DWORD chunk=(DWORD)std::min<size_t>(bytes.size()-offset,65536);if(!WriteFile(inWrite,bytes.data()+offset,chunk,&written,nullptr)||!written)break;offset+=written;}CloseHandle(inWrite);
+  char b[4096];DWORD n;while(ReadFile(outRead,b,sizeof(b),&n,nullptr)&&n)PostMessage(gMain,WM_APPEND,0,(LPARAM)new std::wstring(W(std::string(b,n))));CloseHandle(outRead);DWORD ec;WaitForSingleObject(pi.hProcess,INFINITE);GetExitCodeProcess(pi.hProcess,&ec);CloseHandle(pi.hProcess);gProcess=nullptr;if(gJob){CloseHandle(gJob);gJob=nullptr;}PostMessage(gMain,WM_RUNEND,0,ec);
+}
+void StartRun(bool tests=false){
+  if(gRunning)return;if(gFile.empty()||gDirty){SendMessage(gMain,WM_COMMAND,CMD_SAVE,0);if(gFile.empty()||gDirty)return;}if(gInterpreter.empty()){SetStatus(L"请先选择 Python 解释器");ChoosePython();return;}
+  if(gProblemDir.empty())LoadProblemForFile(gFile);fs::path target=gFile;if(tests){if(gProblemDir.empty()){MessageBoxW(gMain,L"当前文件不属于题目目录。",L"无法运行测试",MB_ICONINFORMATION);return;}target=fs::path(gProblemDir)/L"test_solution.py";if(!fs::is_regular_file(target)){MessageBoxW(gMain,L"题目目录中缺少 test_solution.py。",L"无法运行测试",MB_ICONERROR);return;}}
+  auto input=tests?L"":WindowText(gInput);SetWindowTextW(gOutput,L"");gOutputCollapsed=false;gShowInput=false;gRunning=true;gRunningTests=tests;gLastExit=-1;
+  SetWindowTextW(tests?gTest:gRun,L"■ 停止");EnableWindow(tests?gRun:gTest,FALSE);SetStatus(tests?L"正在运行题目测试":L"正在运行代码");Layout();InvalidateRect(gMain,nullptr,FALSE);std::thread(RunWorker,gInterpreter,target.wstring(),input).detach();
+}
 void StopRun(){if(gJob)TerminateJobObject(gJob,1);else if(gProcess)TerminateProcess(gProcess,1);SetStatus(L"正在停止");}
 
 void ShowCompletion(const std::vector<std::wstring>&v,int prefixBytes=0){
@@ -248,7 +317,7 @@ LRESULT CALLBACK EditProc(HWND h,UINT m,WPARAM w,LPARAM l,UINT_PTR,DWORD_PTR){if
 
 void RegisterOpen(bool remove){wchar_t exe[MAX_PATH];GetModuleFileNameW(nullptr,exe,MAX_PATH);if(remove){SHDeleteKeyW(HKEY_CURRENT_USER,L"Software\\Classes\\Applications\\PyLite.exe");SHDeleteKeyW(HKEY_CURRENT_USER,L"Software\\Classes\\PyLite.File");}else{HKEY k;RegCreateKeyExW(HKEY_CURRENT_USER,L"Software\\Classes\\Applications\\PyLite.exe\\shell\\open\\command",0,nullptr,0,KEY_WRITE,nullptr,&k,nullptr);auto cmd=QuoteWindowsArg(exe)+L" \"%1\"";RegSetValueExW(k,nullptr,0,REG_SZ,(BYTE*)cmd.c_str(),(DWORD)((cmd.size()+1)*2));RegCloseKey(k);RegCreateKeyExW(HKEY_CURRENT_USER,L"Software\\Classes\\Applications\\PyLite.exe\\SupportedTypes",0,nullptr,0,KEY_WRITE,nullptr,&k,nullptr);RegSetValueExW(k,L".py",0,REG_NONE,nullptr,0);RegSetValueExW(k,L".pyw",0,REG_NONE,nullptr,0);RegCloseKey(k);RegCreateKeyExW(HKEY_CURRENT_USER,L"Software\\Classes\\PyLite.File\\shell\\open\\command",0,nullptr,0,KEY_WRITE,nullptr,&k,nullptr);RegSetValueExW(k,nullptr,0,REG_SZ,(BYTE*)cmd.c_str(),(DWORD)((cmd.size()+1)*2));RegCloseKey(k);for(auto e:{L".py",L".pyw"}){std::wstring p=L"Software\\Classes\\"+std::wstring(e)+L"\\OpenWithProgids";RegCreateKeyExW(HKEY_CURRENT_USER,p.c_str(),0,nullptr,0,KEY_WRITE,nullptr,&k,nullptr);RegSetValueExW(k,L"PyLite.File",0,REG_NONE,nullptr,0);RegCloseKey(k);}}SHChangeNotify(SHCNE_ASSOCCHANGED,SHCNF_IDLIST,nullptr,nullptr);SetStatus(remove?L"已从“打开方式”移除":L"已注册到“打开方式”");}
 
-HMENU Menus(){HMENU bar=CreateMenu(),f=CreatePopupMenu(),e=CreatePopupMenu(),r=CreatePopupMenu(),t=CreatePopupMenu();AppendMenuW(f,MF_STRING,CMD_NEW,L"新建\tCtrl+N");AppendMenuW(f,MF_STRING,CMD_OPEN,L"打开文件…\tCtrl+O");AppendMenuW(f,MF_STRING,CMD_FOLDER,L"打开文件夹…\tCtrl+Shift+O");AppendMenuW(f,MF_SEPARATOR,0,nullptr);AppendMenuW(f,MF_STRING,CMD_SAVE,L"保存\tCtrl+S");AppendMenuW(f,MF_STRING,CMD_SAVEAS,L"另存为…\tCtrl+Shift+S");AppendMenuW(f,MF_SEPARATOR,0,nullptr);AppendMenuW(f,MF_STRING,CMD_EXIT,L"退出");AppendMenuW(e,MF_STRING,CMD_UNDO,L"撤销\tCtrl+Z");AppendMenuW(e,MF_STRING,CMD_REDO,L"重做\tCtrl+Y");AppendMenuW(e,MF_SEPARATOR,0,nullptr);AppendMenuW(e,MF_STRING,CMD_CUT,L"剪切");AppendMenuW(e,MF_STRING,CMD_COPY,L"复制");AppendMenuW(e,MF_STRING,CMD_PASTE,L"粘贴");AppendMenuW(e,MF_STRING,CMD_ALL,L"全选\tCtrl+A");AppendMenuW(r,MF_STRING,CMD_RUN,L"运行\tF5");AppendMenuW(r,MF_STRING,CMD_STOP,L"停止\tShift+F5");AppendMenuW(r,MF_STRING,CMD_TOGGLE,L"折叠/展开输出\tCtrl+J");AppendMenuW(t,MF_STRING,CMD_SELECTPY,L"选择 Python…");AppendMenuW(t,MF_SEPARATOR,0,nullptr);AppendMenuW(t,MF_STRING,CMD_REGISTER,L"注册到“打开方式”");AppendMenuW(t,MF_STRING,CMD_UNREGISTER,L"从“打开方式”移除");AppendMenuW(t,MF_STRING,CMD_ABOUT,L"关于");AppendMenuW(bar,MF_POPUP,(UINT_PTR)f,L"文件");AppendMenuW(bar,MF_POPUP,(UINT_PTR)e,L"编辑");AppendMenuW(bar,MF_POPUP,(UINT_PTR)r,L"运行");AppendMenuW(bar,MF_POPUP,(UINT_PTR)t,L"工具");return bar;}
+HMENU Menus(){HMENU bar=CreateMenu(),f=CreatePopupMenu(),e=CreatePopupMenu(),r=CreatePopupMenu(),t=CreatePopupMenu();AppendMenuW(f,MF_STRING,CMD_NEW,L"新建\tCtrl+N");AppendMenuW(f,MF_STRING,CMD_OPEN,L"打开文件…\tCtrl+O");AppendMenuW(f,MF_STRING,CMD_FOLDER,L"打开文件夹…\tCtrl+Shift+O");AppendMenuW(f,MF_SEPARATOR,0,nullptr);AppendMenuW(f,MF_STRING,CMD_SAVE,L"保存\tCtrl+S");AppendMenuW(f,MF_STRING,CMD_SAVEAS,L"另存为…\tCtrl+Shift+S");AppendMenuW(f,MF_SEPARATOR,0,nullptr);AppendMenuW(f,MF_STRING,CMD_EXIT,L"退出");AppendMenuW(e,MF_STRING,CMD_UNDO,L"撤销\tCtrl+Z");AppendMenuW(e,MF_STRING,CMD_REDO,L"重做\tCtrl+Y");AppendMenuW(e,MF_SEPARATOR,0,nullptr);AppendMenuW(e,MF_STRING,CMD_CUT,L"剪切");AppendMenuW(e,MF_STRING,CMD_COPY,L"复制");AppendMenuW(e,MF_STRING,CMD_PASTE,L"粘贴");AppendMenuW(e,MF_STRING,CMD_ALL,L"全选\tCtrl+A");AppendMenuW(r,MF_STRING,CMD_RUN,L"运行代码\tF5");AppendMenuW(r,MF_STRING,CMD_TEST,L"运行测试\tCtrl+F5");AppendMenuW(r,MF_STRING,CMD_STOP,L"停止\tShift+F5");AppendMenuW(r,MF_STRING,CMD_TOGGLE,L"折叠/展开底栏\tCtrl+J");AppendMenuW(t,MF_STRING,CMD_SELECTPY,L"选择 Python…");AppendMenuW(t,MF_SEPARATOR,0,nullptr);AppendMenuW(t,MF_STRING,CMD_REGISTER,L"注册到“打开方式”");AppendMenuW(t,MF_STRING,CMD_UNREGISTER,L"从“打开方式”移除");AppendMenuW(t,MF_STRING,CMD_ABOUT,L"关于");AppendMenuW(bar,MF_POPUP,(UINT_PTR)f,L"文件");AppendMenuW(bar,MF_POPUP,(UINT_PTR)e,L"编辑");AppendMenuW(bar,MF_POPUP,(UINT_PTR)r,L"运行");AppendMenuW(bar,MF_POPUP,(UINT_PTR)t,L"工具");return bar;}
 
 LRESULT CALLBACK Proc(HWND h,UINT m,WPARAM w,LPARAM l){
   switch(m){
@@ -257,23 +326,28 @@ LRESULT CALLBACK Proc(HWND h,UINT m,WPARAM w,LPARAM l){
     gTree=CreateWindowExW(0,WC_TREEVIEWW,L"",WS_CHILD|WS_VISIBLE|WS_TABSTOP|TVS_HASBUTTONS|TVS_SHOWSELALWAYS|TVS_FULLROWSELECT,0,0,0,0,h,(HMENU)ID_TREE,gInst,nullptr);
     gEdit=CreateWindowExW(0,L"Scintilla",L"",WS_CHILD|WS_VISIBLE|WS_TABSTOP|WS_VSCROLL|WS_HSCROLL|WS_CLIPCHILDREN,0,0,0,0,h,(HMENU)ID_EDIT,gInst,nullptr);
     gOutput=CreateWindowExW(0,MSFTEDIT_CLASS,L"",WS_CHILD|WS_VISIBLE|WS_VSCROLL|ES_MULTILINE|ES_READONLY|ES_AUTOVSCROLL,0,0,0,0,h,(HMENU)ID_OUTPUT,gInst,nullptr);
+    gInput=CreateWindowExW(0,MSFTEDIT_CLASS,L"",WS_CHILD|WS_VSCROLL|WS_TABSTOP|ES_MULTILINE|ES_AUTOVSCROLL|ES_WANTRETURN,0,0,0,0,h,(HMENU)ID_INPUT,gInst,nullptr);
+    gStatement=CreateWindowExW(0,MSFTEDIT_CLASS,L"",WS_CHILD|WS_VISIBLE|WS_VSCROLL|ES_MULTILINE|ES_READONLY|ES_AUTOVSCROLL,0,0,0,0,h,(HMENU)ID_STATEMENT,gInst,nullptr);
     gPy=CreateWindowExW(0,L"BUTTON",L"选择 Python",WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW,0,0,0,0,h,(HMENU)ID_PY,gInst,nullptr);
     gRun=CreateWindowExW(0,L"BUTTON",L"▶ 运行",WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW,0,0,0,0,h,(HMENU)ID_RUN,gInst,nullptr);
+    gTest=CreateWindowExW(0,L"BUTTON",L"✓ 测试",WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW,0,0,0,0,h,(HMENU)ID_TEST,gInst,nullptr);
     gSave=CreateWindowExW(0,L"BUTTON",L"保存",WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW,0,0,0,0,h,(HMENU)ID_SAVE,gInst,nullptr);
     gFolder=CreateWindowExW(0,L"BUTTON",L"打开文件夹",WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW,0,0,0,0,h,(HMENU)CMD_FOLDER,gInst,nullptr);
     gClear=CreateWindowExW(0,L"BUTTON",L"清空",WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW,0,0,0,0,h,(HMENU)ID_CLEAR,gInst,nullptr);
     gToggle=CreateWindowExW(0,L"BUTTON",L"折叠",WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW,0,0,0,0,h,(HMENU)ID_TOGGLE,gInst,nullptr);
+    gInputTab=CreateWindowExW(0,L"BUTTON",L"输入",WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW,0,0,0,0,h,(HMENU)ID_TAB_INPUT,gInst,nullptr);
+    gOutputTab=CreateWindowExW(0,L"BUTTON",L"输出",WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW,0,0,0,0,h,(HMENU)ID_TAB_OUTPUT,gInst,nullptr);
     gTooltip=CreateWindowExW(WS_EX_TOPMOST,TOOLTIPS_CLASSW,nullptr,WS_POPUP|TTS_ALWAYSTIP|TTS_NOPREFIX,CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,h,nullptr,gInst,nullptr);
-    AddTooltip(gSave,L"保存  Ctrl+S");AddTooltip(gFolder,L"打开文件夹  Ctrl+Shift+O");AddTooltip(gClear,L"清空输出");AddTooltip(gToggle,L"折叠或展开输出  Ctrl+J");AddTooltip(gPy,L"选择 Python 解释器");AddTooltip(gRun,L"运行或停止  F5 / Shift+F5");SendMessage(gTooltip,TTM_SETMAXTIPWIDTH,0,S(300));
+    AddTooltip(gSave,L"保存  Ctrl+S");AddTooltip(gFolder,L"打开文件夹  Ctrl+Shift+O");AddTooltip(gClear,L"清空当前输入或输出");AddTooltip(gToggle,L"折叠或展开底栏  Ctrl+J");AddTooltip(gPy,L"选择 Python 解释器");AddTooltip(gRun,L"运行当前代码  F5");AddTooltip(gTest,L"运行题目测试  Ctrl+F5");SendMessage(gTooltip,TTM_SETMAXTIPWIDTH,0,S(300));
     SetWindowTheme(gTree,L"Explorer",nullptr);TreeView_SetBkColor(gTree,pylite_ui::Theme::PanelBackground);TreeView_SetTextColor(gTree,pylite_ui::Theme::TextPrimary);TreeView_SetIndent(gTree,S(18));TreeView_SetItemHeight(gTree,S(28));
-    SendMessage(gOutput,EM_SETBKGNDCOLOR,0,pylite_ui::Theme::OutputBackground);SendMessage(gOutput,EM_SETMARGINS,EC_LEFTMARGIN|EC_RIGHTMARGIN,MAKELPARAM(S(12),S(10)));
-    SetControlFonts();Sci(SCI_SETILEXER,0,(sptr_t)CreatePythonLexer());auto keywords=JoinWords(Keywords()),builtins=JoinWords(Builtins());Sci(SCI_SETKEYWORDS,0,(sptr_t)keywords.c_str());Sci(SCI_SETKEYWORDS,1,(sptr_t)builtins.c_str());ConfigureEditor();ApplyParagraphSpacing(gOutput);SetWindowSubclass(gEdit,EditProc,1,0);
-    for(HWND button:{gPy,gRun,gSave,gFolder,gClear,gToggle})SetWindowSubclass(button,ButtonProc,1,0);
-    LoadSettings();Layout();if(!gRoot.empty()&&fs::exists(gRoot))SetRoot(gRoot);DetectPython();UpdateTitle();return 0;
+    for(HWND edit:{gOutput,gInput}){SendMessage(edit,EM_SETBKGNDCOLOR,0,pylite_ui::Theme::OutputBackground);SendMessage(edit,EM_SETMARGINS,EC_LEFTMARGIN|EC_RIGHTMARGIN,MAKELPARAM(S(12),S(10)));}SendMessage(gStatement,EM_SETBKGNDCOLOR,0,pylite_ui::Theme::PanelBackground);SendMessage(gStatement,EM_SETMARGINS,EC_LEFTMARGIN|EC_RIGHTMARGIN,MAKELPARAM(S(14),S(12)));SetWindowTextW(gStatement,L"从左侧打开题目目录中的 solution.py，即可在这里阅读题面。");
+    SetControlFonts();Sci(SCI_SETILEXER,0,(sptr_t)CreatePythonLexer());auto keywords=JoinWords(Keywords()),builtins=JoinWords(Builtins());Sci(SCI_SETKEYWORDS,0,(sptr_t)keywords.c_str());Sci(SCI_SETKEYWORDS,1,(sptr_t)builtins.c_str());ConfigureEditor();ApplyParagraphSpacing(gOutput);ApplyParagraphSpacing(gInput);SetWindowSubclass(gEdit,EditProc,1,0);
+    for(HWND button:{gPy,gRun,gTest,gSave,gFolder,gClear,gToggle,gInputTab,gOutputTab})SetWindowSubclass(button,ButtonProc,1,0);
+    LoadSettings();{auto bundled=BundledProblems();std::wstring leaf;if(!gRoot.empty())leaf=fs::path(gRoot).filename().wstring();std::transform(leaf.begin(),leaf.end(),leaf.begin(),towlower);if(!bundled.empty()&&(gRoot.empty()||!fs::exists(gRoot)||leaf==L"examples"))gRoot=bundled;}Layout();if(!gRoot.empty()&&fs::exists(gRoot))SetRoot(gRoot);DetectPython();UpdateTitle();return 0;
   }
   case WM_SIZE:Layout();InvalidateRect(h,nullptr,FALSE);return 0;
   case WM_DPICHANGED:{
-    gDpi=HIWORD(w);auto suggested=(RECT*)l;SetWindowPos(h,nullptr,suggested->left,suggested->top,suggested->right-suggested->left,suggested->bottom-suggested->top,SWP_NOZORDER|SWP_NOACTIVATE);CreateUiResources();SetControlFonts();ConfigureEditor();ApplyParagraphSpacing(gOutput);SendMessage(gOutput,EM_SETMARGINS,EC_LEFTMARGIN|EC_RIGHTMARGIN,MAKELPARAM(S(12),S(10)));TreeView_SetIndent(gTree,S(18));TreeView_SetItemHeight(gTree,S(28));Layout();InvalidateRect(h,nullptr,FALSE);return 0;
+    gDpi=HIWORD(w);auto suggested=(RECT*)l;SetWindowPos(h,nullptr,suggested->left,suggested->top,suggested->right-suggested->left,suggested->bottom-suggested->top,SWP_NOZORDER|SWP_NOACTIVATE);CreateUiResources();SetControlFonts();ConfigureEditor();ApplyParagraphSpacing(gOutput);ApplyParagraphSpacing(gInput);for(HWND edit:{gOutput,gInput})SendMessage(edit,EM_SETMARGINS,EC_LEFTMARGIN|EC_RIGHTMARGIN,MAKELPARAM(S(12),S(10)));SendMessage(gStatement,EM_SETMARGINS,EC_LEFTMARGIN|EC_RIGHTMARGIN,MAKELPARAM(S(14),S(12)));if(!gProblemDir.empty())RenderStatement(DescriptionFor(gProblemDir));TreeView_SetIndent(gTree,S(18));TreeView_SetItemHeight(gTree,S(28));Layout();InvalidateRect(h,nullptr,FALSE);return 0;
   }
   case WM_PAINT:{PAINTSTRUCT p;auto dc=BeginPaint(h,&p);PaintMain(dc);EndPaint(h,&p);return 0;}
   case WM_ERASEBKGND:return 1;
@@ -311,7 +385,7 @@ LRESULT CALLBACK Proc(HWND h,UINT m,WPARAM w,LPARAM l){
     if(n->idFrom==ID_TREE&&n->code==NM_CUSTOMDRAW){auto*cd=(NMTVCUSTOMDRAW*)l;if(cd->nmcd.dwDrawStage==CDDS_PREPAINT)return CDRF_NOTIFYITEMDRAW;if(cd->nmcd.dwDrawStage==CDDS_ITEMPREPAINT){bool selected=(cd->nmcd.uItemState&CDIS_SELECTED)!=0;cd->clrText=selected?pylite_ui::Theme::SelectedText:pylite_ui::Theme::TextPrimary;cd->clrTextBk=selected?pylite_ui::Theme::SelectedBackground:pylite_ui::Theme::PanelBackground;return CDRF_NEWFONT;}}
     if(n->idFrom==ID_TREE&&n->code==TVN_DELETEITEMW){auto*t=(NMTREEVIEWW*)l;if(t->itemOld.lParam)delete (std::wstring*)t->itemOld.lParam;}
     if(n->idFrom==ID_TREE&&n->code==TVN_ITEMEXPANDINGW){auto*t=(NMTREEVIEWW*)l;if(t->action==TVE_EXPAND){TVITEMW i{};i.mask=TVIF_PARAM;i.hItem=t->itemNew.hItem;TreeView_GetItem(gTree,&i);if(i.lParam)LoadChildren(i.hItem,*(std::wstring*)i.lParam);}}
-    if(n->idFrom==ID_TREE&&n->code==NM_DBLCLK){auto item=TreeView_GetSelection(gTree);TVITEMW i{};i.mask=TVIF_PARAM;i.hItem=item;TreeView_GetItem(gTree,&i);if(i.lParam&&!fs::is_directory(*(std::wstring*)i.lParam))OpenFile(*(std::wstring*)i.lParam);}
+    if(n->idFrom==ID_TREE&&n->code==NM_DBLCLK){auto item=TreeView_GetSelection(gTree);TVITEMW i{};i.mask=TVIF_PARAM;i.hItem=item;TreeView_GetItem(gTree,&i);if(i.lParam&&!fs::is_directory(*(std::wstring*)i.lParam))OpenTreePath(*(std::wstring*)i.lParam);}
     if(n->idFrom==ID_EDIT){auto*sc=(SCNotification*)l;
       if(sc->nmhdr.code==SCN_SAVEPOINTLEFT&&!gFormatting){gDirty=true;UpdateTitle();}
       else if(sc->nmhdr.code==SCN_SAVEPOINTREACHED&&!gFormatting){gDirty=false;UpdateTitle();}
@@ -323,16 +397,17 @@ LRESULT CALLBACK Proc(HWND h,UINT m,WPARAM w,LPARAM l){
   }
   case WM_COMMAND:{
     int id=LOWORD(w);
-    if(id==ID_PY||id==CMD_SELECTPY)ChoosePython();else if(id==ID_RUN||id==CMD_RUN)(gRunning?StopRun():StartRun());else if(id==CMD_STOP)StopRun();
-    else if(id==CMD_NEW){if(ConfirmDiscard()){gFile.clear();gEncoding=L"UTF-8";SetEditorText(L"");}}
+    if(id==ID_PY||id==CMD_SELECTPY)ChoosePython();else if(id==ID_RUN||id==CMD_RUN)(gRunning?StopRun():StartRun(false));else if(id==ID_TEST||id==CMD_TEST)(gRunning?StopRun():StartRun(true));else if(id==CMD_STOP)StopRun();
+    else if(id==CMD_NEW){if(ConfirmDiscard()){gFile.clear();gProblemDir.clear();gEncoding=L"UTF-8";SetEditorText(L"");SetWindowTextW(gStatement,L"从左侧打开题目目录中的 solution.py，即可在这里阅读题面。");}}
     else if(id==CMD_OPEN){auto p=FileDialog(false);if(!p.empty())OpenFile(p);}else if(id==CMD_FOLDER){auto p=FolderDialog();if(!p.empty())SetRoot(p);}
     else if(id==CMD_SAVE||id==ID_SAVE){if(gFile.empty()){auto p=FileDialog(true);if(!p.empty())SaveTo(p);}else SaveTo(gFile);}else if(id==CMD_SAVEAS){auto p=FileDialog(true);if(!p.empty()){gEncoding=L"UTF-8";SaveTo(p);}}
     else if(id==CMD_EXIT)SendMessage(h,WM_CLOSE,0,0);else if(id==CMD_UNDO)Sci(SCI_UNDO);else if(id==CMD_REDO)Sci(SCI_REDO);else if(id==CMD_CUT)Sci(SCI_CUT);else if(id==CMD_COPY)Sci(SCI_COPY);else if(id==CMD_PASTE)Sci(SCI_PASTE);else if(id==CMD_ALL)Sci(SCI_SELECTALL);
-    else if(id==CMD_TOGGLE||id==ID_TOGGLE){gOutputCollapsed=!gOutputCollapsed;Layout();InvalidateRect(gToggle,nullptr,FALSE);InvalidateRect(h,nullptr,FALSE);SaveSettings();}else if(id==ID_CLEAR){SetWindowTextW(gOutput,L"");gLastExit=-1;InvalidateRect(h,nullptr,FALSE);}
+    else if(id==ID_TAB_INPUT||id==ID_TAB_OUTPUT){gShowInput=id==ID_TAB_INPUT;gOutputCollapsed=false;Layout();InvalidateRect(gInputTab,nullptr,FALSE);InvalidateRect(gOutputTab,nullptr,FALSE);InvalidateRect(h,nullptr,FALSE);}
+    else if(id==CMD_TOGGLE||id==ID_TOGGLE){gOutputCollapsed=!gOutputCollapsed;Layout();InvalidateRect(gToggle,nullptr,FALSE);InvalidateRect(h,nullptr,FALSE);SaveSettings();}else if(id==ID_CLEAR){SetWindowTextW(gShowInput?gInput:gOutput,L"");if(!gShowInput)gLastExit=-1;InvalidateRect(h,nullptr,FALSE);}
     else if(id==CMD_REGISTER)RegisterOpen(false);else if(id==CMD_UNREGISTER)RegisterOpen(true);else if(id==CMD_ABOUT)MessageBoxW(h,L"PyLite 1.0\n轻量级 Python 编辑器\n原生 Win32 便携版",L"关于",MB_OK);return 0;
   }
   case WM_APPEND:{auto*s=(std::wstring*)l;AppendOutput(*s);delete s;return 0;}
-  case WM_RUNEND:{gRunning=false;SetWindowTextW(gRun,L"▶ 运行");gLastExit=(int)(DWORD)l;AppendOutput(L"\r\n● 已完成 · 退出码 "+std::to_wstring((DWORD)l)+L"\r\n");SetStatus(gLastExit==0?L"运行成功":L"运行失败");InvalidateRect(gRun,nullptr,FALSE);InvalidateRect(h,nullptr,FALSE);return 0;}
+  case WM_RUNEND:{bool tests=gRunningTests;gRunning=false;gRunningTests=false;SetWindowTextW(gRun,L"▶ 运行");SetWindowTextW(gTest,L"✓ 测试");EnableWindow(gRun,TRUE);EnableWindow(gTest,TRUE);gLastExit=(int)(DWORD)l;AppendOutput(L"\r\n● 已完成 · 退出码 "+std::to_wstring((DWORD)l)+L"\r\n");SetStatus(tests?(gLastExit==0?L"全部测试通过":L"测试未通过"):(gLastExit==0?L"运行成功":L"运行失败"));InvalidateRect(gRun,nullptr,FALSE);InvalidateRect(gTest,nullptr,FALSE);InvalidateRect(h,nullptr,FALSE);return 0;}
   case WM_INTERPRETER:{auto*p=(std::pair<std::wstring,std::wstring>*)l;if(!p->second.empty()){gInterpreter=p->first;SetWindowTextW(gPy,p->second.c_str());SetStatus(L"Python 解释器有效");{std::lock_guard lk(gCacheMutex);gModuleCache.clear();}SaveSettings();}else{SetWindowTextW(gPy,L"选择 Python");SetStatus(L"Python 解释器不可用");}InvalidateRect(gPy,nullptr,FALSE);delete p;return 0;}
   case WM_COMPLETIONS:{auto*v=(std::vector<std::wstring>*)l;if((unsigned)w==gCompletionRequest){ShowCompletion(*v);SetStatus(v->empty()?L"模块补全不可用":L"模块补全已加载");}delete v;return 0;}
   case WM_CLOSE:if(!ConfirmDiscard())return 0;SaveSettings();if(gJob)TerminateJobObject(gJob,1);DestroyWindow(h);return 0;
@@ -347,5 +422,5 @@ int WINAPI wWinMain(HINSTANCE hi,HINSTANCE,PWSTR,int show){
   if(!Scintilla_RegisterClasses(hi)){MessageBoxW(nullptr,L"无法初始化代码编辑器。",L"PyLite",MB_ICONERROR);LocalFree(argv);CoUninitialize();return 1;}
   WNDCLASSEXW wc{sizeof(wc),0,Proc,0,0,hi,LoadIconW(hi,MAKEINTRESOURCEW(1)),LoadCursor(nullptr,IDC_ARROW),nullptr,nullptr,L"PyLiteWindow",LoadIconW(hi,MAKEINTRESOURCEW(1))};RegisterClassExW(&wc);
   auto h=CreateWindowExW(0,wc.lpszClassName,L"未命名.py — PyLite",WS_OVERLAPPEDWINDOW,CW_USEDEFAULT,CW_USEDEFAULT,1200,800,nullptr,nullptr,hi,nullptr);ShowWindow(h,show);UpdateWindow(h);if(argc>1&&argv[1][0]!=L'-')OpenFile(argv[1]);LocalFree(argv);
-  ACCEL a[]={{FVIRTKEY|FCONTROL,'N',CMD_NEW},{FVIRTKEY|FCONTROL,'O',CMD_OPEN},{FVIRTKEY|FCONTROL|FSHIFT,'O',CMD_FOLDER},{FVIRTKEY|FCONTROL,'S',CMD_SAVE},{FVIRTKEY|FCONTROL|FSHIFT,'S',CMD_SAVEAS},{FVIRTKEY|FCONTROL,'Z',CMD_UNDO},{FVIRTKEY|FCONTROL,'Y',CMD_REDO},{FVIRTKEY|FCONTROL,'A',CMD_ALL},{FVIRTKEY,VK_F5,CMD_RUN},{FVIRTKEY|FSHIFT,VK_F5,CMD_STOP},{FVIRTKEY|FCONTROL,'J',CMD_TOGGLE}};auto ac=CreateAcceleratorTableW(a,ARRAYSIZE(a));MSG msg;while(GetMessageW(&msg,nullptr,0,0)){if(!TranslateAcceleratorW(h,ac,&msg)){TranslateMessage(&msg);DispatchMessageW(&msg);}}DestroyAcceleratorTable(ac);Scintilla_ReleaseResources();CoUninitialize();return(int)msg.wParam;
+  ACCEL a[]={{FVIRTKEY|FCONTROL,'N',CMD_NEW},{FVIRTKEY|FCONTROL,'O',CMD_OPEN},{FVIRTKEY|FCONTROL|FSHIFT,'O',CMD_FOLDER},{FVIRTKEY|FCONTROL,'S',CMD_SAVE},{FVIRTKEY|FCONTROL|FSHIFT,'S',CMD_SAVEAS},{FVIRTKEY|FCONTROL,'Z',CMD_UNDO},{FVIRTKEY|FCONTROL,'Y',CMD_REDO},{FVIRTKEY|FCONTROL,'A',CMD_ALL},{FVIRTKEY,VK_F5,CMD_RUN},{FVIRTKEY|FCONTROL,VK_F5,CMD_TEST},{FVIRTKEY|FSHIFT,VK_F5,CMD_STOP},{FVIRTKEY|FCONTROL,'J',CMD_TOGGLE}};auto ac=CreateAcceleratorTableW(a,ARRAYSIZE(a));MSG msg;while(GetMessageW(&msg,nullptr,0,0)){if(!TranslateAcceleratorW(h,ac,&msg)){TranslateMessage(&msg);DispatchMessageW(&msg);}}DestroyAcceleratorTable(ac);Scintilla_ReleaseResources();CoUninitialize();return(int)msg.wParam;
 }
