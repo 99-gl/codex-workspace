@@ -5,6 +5,7 @@ using namespace pylite;
 void ok(bool v,const char*m){if(!v)throw std::runtime_error(m);}
 int main(){
  auto c=StaticCompletions("def hello():\n x=1\nclass World:\n pass\nimport json\n"); ok(std::find(c.begin(),c.end(),"print")!=c.end(),"builtin"); ok(std::find(c.begin(),c.end(),"hello")!=c.end(),"function"); ok(std::find(c.begin(),c.end(),"World")!=c.end(),"class"); ok(std::find(c.begin(),c.end(),"json")!=c.end(),"import");
+ ok(MatchingCloser('(')==')'&&MatchingCloser('[')==']'&&MatchingCloser('{')=='}'&&MatchingCloser('"')=='"',"matching pairs");ok(MatchingCloser('x')==0,"non-pair character");
  auto i=ParseImports("import numpy as np\nfrom pathlib import Path as P, PurePath\n"); ok(i.aliases["np"]=="numpy","alias"); ok(i.aliases["P"]=="pathlib.Path","from alias"); ok(i.aliases["PurePath"]=="pathlib.PurePath","from");
  ok(AttributeContext("x = torch.nn.")=="torch.nn","nested attribute"); ok(ResolveModule(ParseImports("import torch\n"),"torch.nn")=="torch.nn","resolve nested");
  auto plain=AttributeCompletionContext("value = collections.");ok(plain.expression=="collections"&&plain.prefix.empty(),"attribute completion without prefix");

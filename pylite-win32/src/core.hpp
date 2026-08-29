@@ -33,6 +33,9 @@ inline std::vector<std::string> StaticCompletions(const std::string& text,const 
     std::regex decl(R"(^\s*(?:async\s+)?(?:def|class)\s+([A-Za-z_]\w*)|^\s*([A-Za-z_]\w*)\s*=)",std::regex::multiline); for(auto i=std::sregex_iterator(text.begin(),text.end(),decl);i!=std::sregex_iterator();++i) names.insert((*i)[1].matched?(*i)[1].str():(*i)[2].str());
     std::vector<std::string> out; for(auto& n:names) if(prefix.empty()||n.rfind(prefix,0)==0) out.push_back(n); if(out.size()>100) out.resize(100); return out;
 }
+inline char MatchingCloser(char ch) {
+    switch(ch){case '(':return ')';case '[':return ']';case '{':return '}';case '"':return '"';default:return 0;}
+}
 struct AttributeCompletion { std::string expression,prefix; explicit operator bool()const{return !expression.empty();} };
 inline AttributeCompletion AttributeCompletionContext(const std::string& beforeCaret) {
     std::smatch m; if(std::regex_search(beforeCaret,m,std::regex(R"(([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)\.([A-Za-z_]\w*)?$)"))) return {m[1].str(),m[2].str()}; return {};
