@@ -1,0 +1,28 @@
+PyLite static Scintilla Windows build failure
+==============================================
+
+Source branch: implement/win32-ui-refresh
+Source commit: bf7e3d4 (fix: preserve dynamic completion context)
+Build date: 2026-08-29 UTC
+
+Command used:
+
+  PYLITE_MINGW_ROOT=/workspace/scratch/2521fbd228d8/.bootstrap/mingw \
+    bash pylite-win32/scripts/build-win-x64.sh
+
+Completed successfully before the compiler step:
+
+  - Linux core tests
+  - UI structure tests
+  - DPI manifest validation
+
+Compiler failure:
+
+  pylite-win32/vendor/scintilla/src/AutoComplete.cxx:8
+  fatal error: stddef.h: No such file or directory
+
+The MinGW GCC C++ standard header cstddef invokes #include_next <stddef.h>,
+but the required C header was not found in the compiler include search path
+while compiling the vendored static Scintilla source.
+
+No EXE was produced and no source file was modified by this build handoff.
