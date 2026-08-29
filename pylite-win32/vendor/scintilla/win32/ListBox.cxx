@@ -255,7 +255,10 @@ void ListBoxX::Create(Window &parent_, int ctrlID_, Point location_, int lineHei
 	lineHeight = lineHeight_;
 	unicodeMode = unicodeMode_;
 	codePage = unicodeMode ? CpUtf8 : 0;
-	technology = technology_;
+	// The completion popup is a short, row-based list. GDI avoids the
+	// DirectWrite/D2D setup and bitmap scaling cost on every wheel repaint.
+	(void)technology_;
+	technology = Technology::Default;
 	HWND hwndParent = HwndFromWindow(*parent);
 	HINSTANCE hinstanceParent = GetWindowInstance(hwndParent);
 	// Window created as popup so not clipped within parent client area
@@ -950,7 +953,18 @@ LRESULT ListBoxX::WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam
 		}
 		return ::DefWindowProc(hWnd, iMessage, wParam, lParam);
 	case WM_MOUSEWHEEL:
-		return lb ? ::SendMessage(lb, iMessage, wParam, lParam) : 0;
+		if (lb) {
+			const int delta = GET_WHEEL_DELTA_WPARAM(wParam);
+			if (delta != 0) {
+				// React to high-resolution wheel input immediately instead of waiting
+				// for the deltas to accumulate to a full WHEEL_DELTA step.
+				const int rows = std::max(1, std::abs(delta) * 3 / WHEEL_DELTA);
+				const int direction = delta > 0 ? -1 : 1;
+				const int top = std::max(0, ListBox_GetTopIndex(lb) + direction * rows);
+				ListBox_SetTopIndex(lb, top);
+			}
+		}
+		return 0;
 
 	default:
 		return ::DefWindowProc(hWnd, iMessage, wParam, lParam);
