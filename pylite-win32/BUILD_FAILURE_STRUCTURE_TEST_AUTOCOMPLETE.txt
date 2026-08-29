@@ -1,0 +1,30 @@
+PyLite Win32 autocomplete structure-test failure
+=================================================
+
+Source branch: implement/win32-ui-refresh
+Source commit: 749d09d (fix: filter autocomplete candidates by prefix)
+Build date: 2026-08-29 UTC
+
+Command used:
+
+  PYLITE_MINGW_ROOT=/workspace/scratch/2521fbd228d8/.bootstrap/mingw \
+    bash pylite-win32/scripts/build-win-x64.sh
+
+Completed successfully before the failure:
+
+  - Linux core tests
+
+Failure:
+
+  pylite-win32/tests/structure_tests.sh line 15 requires this exact text:
+
+    SendMessage(lb, iMessage, wParam, lParam)
+
+  The vendored Scintilla source now contains the functionally equivalent
+  scoped call at ListBox.cxx line 953:
+
+    ::SendMessage(lb, iMessage, wParam, lParam)
+
+The stale textual structure check therefore fails before manifest validation
+or Windows compilation starts. No EXE was produced and no source or test file
+was modified by this build handoff.
