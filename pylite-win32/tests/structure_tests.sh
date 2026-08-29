@@ -7,13 +7,12 @@ for token in 'WC_TREEVIEWW' 'MSFTEDIT_CLASS' 'CMD_TOGGLE' 'CMD_TEST' 'ID_STATEME
 done
 ! rg -q '内容待定' "$source_file"
 ! rg -q 'WS_EX_COMPOSITED' "$source_file"
+! rg -q 'SetWindowSubclass\(gEdit|gSuppressTabCharacter|AcceptCompletion' "$source_file"
 rg -q 'HandleAutoPair' "$source_file"
+rg -q 'SCI_AUTOCSETIGNORECASE,TRUE' "$source_file"
 rg -q 'CompleteImport' "$source_file"
-for token in 'WC_LISTBOXW' 'EditorProc' 'CompletionListProc' 'WM_REFRESH_COMPLETION' 'LB_ADDSTRING' 'gSuppressCompletionChar' 'SendMessage\(gCompletionList,WM_MOUSEWHEEL'; do
-  rg -q "$token" "$source_file"
-done
-! rg -q 'SCI_AUTOCSHOW|SCI_AUTOCCANCEL|SCN_AUTOCCHARDELETED' "$source_file"
-rg -q 'MouseWheelDelta wheelDelta' "$root/vendor/scintilla/win32/ListBox.cxx"
+rg -q 'SCN_AUTOCCHARDELETED' "$source_file"
+rg -Fq '::SendMessage(lb, iMessage, wParam, lParam)' "$root/vendor/scintilla/win32/ListBox.cxx"
 ! rg -q '<dpiAware xmlns=.*>PerMonitorV2' "$root/resources/app.manifest"
 test -f "$root/UI_REDESIGN_SPEC_FOR_CODEX.txt"
 rg -q 'PYTHONIOENCODING' "$source_file"

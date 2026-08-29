@@ -181,7 +181,6 @@ class ListBoxX : public ListBox {
 	}
 
 	LBGraphics graphics;
-	MouseWheelDelta wheelDelta;
 
 	HWND GetHWND() const noexcept;
 	void AppendListItem(const char *text, const char *numword);
@@ -951,14 +950,7 @@ LRESULT ListBoxX::WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam
 		}
 		return ::DefWindowProc(hWnd, iMessage, wParam, lParam);
 	case WM_MOUSEWHEEL:
-		if (wheelDelta.Accumulate(wParam)) {
-			const int nRows = GetVisibleRows();
-			int linesToScroll = std::clamp(nRows - 1, 1, 3);
-			linesToScroll *= wheelDelta.Actions();
-			const int top = std::max(0, ListBox_GetTopIndex(lb) + linesToScroll);
-			ListBox_SetTopIndex(lb, top);
-		}
-		break;
+		return lb ? ::SendMessage(lb, iMessage, wParam, lParam) : 0;
 
 	default:
 		return ::DefWindowProc(hWnd, iMessage, wParam, lParam);
