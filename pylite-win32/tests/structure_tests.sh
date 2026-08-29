@@ -13,6 +13,9 @@ rg -q 'PYTHONIOENCODING' "$source_file"
 rg -q -- '--register-open-with' "$source_file"
 rg -q 'dyLineSpacing=28' "$source_file"
 ! rg -q 'dyLineSpacing=330' "$source_file"
+rg -Fq 'gRight=480' "$source_file"
+rg -Fq 'JsonInt(s,"right",480),160,1600' "$source_file"
+! rg -Fq 'JsonInt(s,"right",360),160,420' "$source_file"
 for removed in 'PyLiteGutter' 'gGutter' 'gPopup' 'ColorRange' 'void Highlight' 'EM_GETFIRSTVISIBLELINE' 'gLastEditTick'; do
   ! rg -q "$removed" "$source_file"
 done
