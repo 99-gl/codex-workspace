@@ -28,10 +28,13 @@ inline Imports ParseImports(const std::string& text) {
         }
     } return out;
 }
+inline bool StartsWithInsensitive(const std::string& value,const std::string& prefix) {
+    return prefix.size()<=value.size()&&std::equal(prefix.begin(),prefix.end(),value.begin(),[](unsigned char a,unsigned char b){return std::tolower(a)==std::tolower(b);});
+}
 inline std::vector<std::string> StaticCompletions(const std::string& text,const std::string& prefix="") {
     std::set<std::string> names(Keywords().begin(),Keywords().end()); names.insert(Builtins().begin(),Builtins().end()); auto im=ParseImports(text); names.insert(im.names.begin(),im.names.end());
     std::regex decl(R"(^\s*(?:async\s+)?(?:def|class)\s+([A-Za-z_]\w*)|^\s*([A-Za-z_]\w*)\s*=)",std::regex::multiline); for(auto i=std::sregex_iterator(text.begin(),text.end(),decl);i!=std::sregex_iterator();++i) names.insert((*i)[1].matched?(*i)[1].str():(*i)[2].str());
-    std::vector<std::string> out; for(auto& n:names) if(prefix.empty()||n.rfind(prefix,0)==0) out.push_back(n); if(out.size()>100) out.resize(100); return out;
+    std::vector<std::string> out; for(auto& n:names) if(prefix.empty()||StartsWithInsensitive(n,prefix)) out.push_back(n); if(out.size()>100) out.resize(100); return out;
 }
 inline char MatchingCloser(char ch) {
     switch(ch){case '(':return ')';case '[':return ']';case '{':return '}';case '"':return '"';default:return 0;}
@@ -39,6 +42,10 @@ inline char MatchingCloser(char ch) {
 struct AttributeCompletion { std::string expression,prefix; explicit operator bool()const{return !expression.empty();} };
 inline AttributeCompletion AttributeCompletionContext(const std::string& beforeCaret) {
     std::smatch m; if(std::regex_search(beforeCaret,m,std::regex(R"(([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)\.([A-Za-z_]\w*)?$)"))) return {m[1].str(),m[2].str()}; return {};
+}
+struct ImportCompletion { bool active{};std::string prefix;explicit operator bool()const{return active;} };
+inline ImportCompletion ImportCompletionContext(const std::string& beforeCaret) {
+    std::smatch m;if(std::regex_search(beforeCaret,m,std::regex(R"((?:^|\n)\s*(?:import|from)\s+([A-Za-z_]\w*)?$)")))return {true,m[1].matched?m[1].str():std::string{}};return {};
 }
 inline std::string AttributeContext(const std::string& beforeCaret) {
     auto context=AttributeCompletionContext(beforeCaret);return context&&context.prefix.empty()?context.expression:std::string{};

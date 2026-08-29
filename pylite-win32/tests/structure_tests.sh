@@ -9,6 +9,8 @@ done
 ! rg -q 'WS_EX_COMPOSITED' "$source_file"
 ! rg -q 'SetWindowSubclass\(gEdit|gSuppressTabCharacter|AcceptCompletion' "$source_file"
 rg -q 'HandleAutoPair' "$source_file"
+rg -q 'SCI_AUTOCSETIGNORECASE,TRUE' "$source_file"
+rg -q 'CompleteImport' "$source_file"
 ! rg -q '<dpiAware xmlns=.*>PerMonitorV2' "$root/resources/app.manifest"
 test -f "$root/UI_REDESIGN_SPEC_FOR_CODEX.txt"
 rg -q 'PYTHONIOENCODING' "$source_file"

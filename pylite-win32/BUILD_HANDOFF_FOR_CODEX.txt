@@ -50,6 +50,7 @@ PyLite Win32 界面改版：Linux 构建交接
 - 移除编辑器上重复的 Tab 子类拦截，候选确认完全交给 Scintilla 原生按键路径，避免补全后再插入一个制表符；
 - 动态属性补全会在输入点号后的前缀时持续生效，例如 collections.de 仍使用 collections 的属性候选并定位到 deque，而不会退回 def/del 等静态候选；
 - 编辑器会自动补齐 ()、[]、{} 和双引号，并将光标留在成对字符之间；键入已有的右侧括号或双引号时不得产生重复字符；
+- 所有候选匹配均忽略大小写；import/from 行会异步读取当前解释器的可导入模块，因此 import tor 可提示 torch；大型模块属性查询超时放宽到 20 秒，失败结果不再永久缓存，候选容量由 500 提高到 2000 以覆盖 torch.nn、torch.tensor 等靠后的名称；
 - 构建新增 Scintilla/Lexilla 源码静态编译及系统 uxtheme、imm32、oleaut32 链接；
 - 修正 RichEdit 行距参数：1.4 倍行距使用 rule 5 + dyLineSpacing=28；
 - 编辑区滚动不再依赖异步 InvalidateRect 刷新行号，也不在滚动期间运行正则全文高亮。
@@ -96,6 +97,7 @@ Windows 真机后续验证项
 - 输入 coll 后按 Tab，应得到 collections 且光标紧跟单词末尾，不得额外缩进；
 - import collections 后输入 collections.de，候选应继续包含并定位到 deque/defaultdict，不得切换成 def/del/delattr；
 - 分别键入 (、[、{、双引号，检查右侧字符自动生成且光标位于中间；随后键入闭合字符，检查不会出现重复闭合字符；
+- 选择包含 Torch 的解释器后，import tor 应出现 torch；完成 import torch 后输入 torch. 应加载属性；以小写前缀输入时也应包含对应的大写候选；
 - stdout/stderr、退出码、折叠和清空；
 - 打开 problems/0300-longest-increasing-subsequence/solution.py 后右侧显示题面；
 - 在输入标签填入样例，F5 应把内容传给 solution.py；

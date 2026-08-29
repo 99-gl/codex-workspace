@@ -7,7 +7,8 @@ PyLite 是一个面向 Windows 10/11 x64 的轻量 Python 记事本。它是原�
 - 单文件新建、打开、保存、另存为和未保存修改确认
 - UTF-8、UTF-8 BOM 以及 PEP 263 `gbk`/`latin-1` 声明读取与原编码保存
 - Python 关键字、字符串、注释、数字、函数、类和装饰器语法高亮
-- Python 关键字、内置名称、函数、类、变量和 import 名称补全
+- Python 关键字、内置名称、函数、类、变量和 import 名称补全，候选匹配忽略大小写
+- 在 `import`/`from` 后异步读取当前解释器的可导入模块，例如输入 `import tor` 可补全为 `import torch`
 - 通过独立 Python 子进程为 `json.`、`numpy as np`、`torch.nn.` 等上下文获取动态属性补全
 - Python 解释器检测与选择，异步运行脚本，实时输出、退出码和进程树停止
 - ACM 刷题模式：右侧原生轻量 Markdown 题面、底部自定义输入/输出切换
