@@ -39,16 +39,17 @@ PyLite Win32 界面改版：Linux 构建交接
 - 保存、解释器、运行、打开文件夹、清空、折叠改为 BS_OWNERDRAW；
 - 加入集中式浅色主题和 DPI 缩放资源；
 - TreeView 使用 Explorer 主题、28 px 行高、系统文件图标和现代选中颜色；
-- RichEdit 去掉 WS_EX_CLIENTEDGE，增加编辑边距、正常字重和行距；
-- 加入只绘制可见行的 PyLiteGutter 行号栏；
+- 正文编辑器由 RichEdit + 独立 PyLiteGutter 迁移为静态集成的 Scintilla 5.6.6；
+- Python 高亮改用静态集成的 Lexilla 5.5.3 Python lexer；
+- 行号、正文、选区和滚动条由同一个 Scintilla 控件同步绘制；
 - 输出区和状态栏改为轻量自绘；
 - 布局使用 DeferWindowPos；
 - 没有使用 WS_EX_COMPOSITED；
-- 语法高亮从“脏文件每 350 ms 全量重复执行”改为每次变更仅调度一次；
-- 构建新增系统 uxtheme 链接。
+- 删除 RichEdit 正文区的定时正则全文重着色和独立行号栏刷新路径；
+- 补全列表改用 Scintilla 原生自动补全窗口，保留原来的静态和 Python 模块动态补全来源；
+- 构建新增 Scintilla/Lexilla 源码静态编译及系统 uxtheme、imm32、oleaut32 链接；
 - 修正 RichEdit 行距参数：1.4 倍行距使用 rule 5 + dyLineSpacing=28；
-- 编辑区滚动时不再重复更新标题和状态栏，行号栏只枚举有限数量的可见行；
-- 语法高亮改为停止输入至少 300 ms 后再运行，避免编辑期间重复全量着色。
+- 编辑区滚动不再依赖异步 InvalidateRect 刷新行号，也不在滚动期间运行正则全文高亮。
 
 
 需要特别核对的编译点
@@ -56,6 +57,9 @@ PyLite Win32 界面改版：Linux 构建交接
 
 - src/ui_theme.hpp 中 EnumFontFamiliesExW 的回调类型；
 - uxtheme.h 与 -luxtheme；
+- vendor/scintilla 与 vendor/lexilla 的 C++17 静态编译；
+- Scintilla DirectWrite 后端需要的 imm32、ole32、oleaut32、uuid 和 advapi32；
+- CreatePythonLexer 返回的 ILexer5 交由 SCI_SETILEXER 管理；
 - RichEdit PARAFORMAT2 / PFM_LINESPACING；
 - NMTVCUSTOMDRAW、TVN_DELETEITEMW 和系统 HIMAGELIST；
 - WM_DPICHANGED 在 _WIN32_WINNT=0x0601 编译目标下的头文件可用性；

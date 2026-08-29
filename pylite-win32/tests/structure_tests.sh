@@ -2,7 +2,7 @@
 set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source_file="$root/src/main.cpp"
-for token in 'WC_TREEVIEWW' 'MSFTEDIT_CLASS' 'CMD_TOGGLE' 'RegisterOpen' 'DynamicComplete' 'CreateJobObjectW' 'JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE' 'WM_GETMINMAXINFO' '1200,800' 'BS_OWNERDRAW' 'PyLiteGutter' 'DeferWindowPos' 'WM_DPICHANGED' 'SetWindowTheme' 'TrackPopupMenuEx'; do
+for token in 'WC_TREEVIEWW' 'MSFTEDIT_CLASS' 'CMD_TOGGLE' 'RegisterOpen' 'DynamicComplete' 'CreateJobObjectW' 'JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE' 'WM_GETMINMAXINFO' '1200,800' 'BS_OWNERDRAW' 'DeferWindowPos' 'WM_DPICHANGED' 'SetWindowTheme' 'TrackPopupMenuEx' 'Scintilla_RegisterClasses' 'SCI_SETILEXER' 'SC_MARGIN_NUMBER' 'SC_TECHNOLOGY_DIRECTWRITE' 'SCN_UPDATEUI'; do
   rg -q "$token" "$source_file"
 done
 ! rg -q '内容待定' "$source_file"
@@ -13,6 +13,11 @@ rg -q 'PYTHONIOENCODING' "$source_file"
 rg -q -- '--register-open-with' "$source_file"
 rg -q 'dyLineSpacing=28' "$source_file"
 ! rg -q 'dyLineSpacing=330' "$source_file"
-rg -q 'gLastEditTick' "$source_file"
-rg -q 'visibleBudget' "$source_file"
+for removed in 'PyLiteGutter' 'gGutter' 'gPopup' 'ColorRange' 'void Highlight' 'EM_GETFIRSTVISIBLELINE' 'gLastEditTick'; do
+  ! rg -q "$removed" "$source_file"
+done
+test -f "$root/vendor/scintilla/License.txt"
+test -f "$root/vendor/lexilla/License.txt"
+rg -q '566' "$root/vendor/scintilla/version.txt"
+rg -q '553' "$root/vendor/lexilla/version.txt"
 echo "All structure tests passed"
