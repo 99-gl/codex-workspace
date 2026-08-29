@@ -1,0 +1,37 @@
+PyLite Win32 UI refresh build failure
+=====================================
+
+Source branch: implement/win32-ui-refresh
+Source commit: 2cd4ce7 (fix: smooth editor scrolling and line spacing)
+Build date: 2026-08-29 UTC
+
+Command used:
+
+  PYLITE_MINGW_ROOT=/workspace/scratch/2521fbd228d8/.bootstrap/mingw \
+    bash pylite-win32/scripts/build-win-x64.sh
+
+Completed successfully before the compiler step:
+
+  - Linux core tests
+  - UI structure tests
+  - DPI manifest validation
+
+Compiler failure:
+
+  pylite-win32/src/main.cpp:180
+  no matching function for call to std::max(int, long int)
+
+Failing expression:
+
+  int visibleBudget=std::max(8,r.bottom/std::max(1,S(16))+4)
+
+The Win32 RECT::bottom field is LONG while the first std::max argument is int.
+MinGW GCC 13 cannot infer a single template type. The subsequent 'last was not
+declared' message is a cascading error from this failed initializer.
+
+No EXE was produced and no source file was modified by this build handoff.
+Suggested source-side correction, intentionally not applied in this handoff:
+
+  std::max(8, (int)r.bottom / std::max(1, S(16)) + 4)
+
+or make both operands explicitly LONG/int before calling std::max.
